@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import useEventStore from '../../store/eventStore';
 import useScoreStore from '../../store/scoreStore';
+import { issueJudgeCertificate } from '../../services/judgeCertificateService';
 
 export default function JudgePublicScoring() {
   const { eventId } = useParams();
@@ -17,6 +18,7 @@ export default function JudgePublicScoring() {
   const [remarks, setRemarks] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [certificateDelivery, setCertificateDelivery] = useState(null);
   const [error, setError] = useState('');
   const [eventsLoaded, setEventsLoaded] = useState(false);
 
@@ -124,6 +126,13 @@ export default function JudgePublicScoring() {
           setSubmitSuccess(false);
         }, 800);
       } else {
+        const delivery = await issueJudgeCertificate({
+          event,
+          judgeName: judgeName.trim(),
+          judgeEmail: judgeEmail.trim(),
+          scoredCount: contestants.length,
+        });
+        setCertificateDelivery(delivery);
         setPhase('done');
       }
     } catch {
@@ -226,6 +235,19 @@ export default function JudgePublicScoring() {
           <h2 style={{ margin: '0 0 10px', fontSize: 26, fontWeight: 900, color: '#0f172a' }}>Thank you, {judgeName}!</h2>
           <p style={{ margin: '0 0 4px', color: '#475569', fontSize: 14, lineHeight: 1.7 }}>All your scores have been recorded for</p>
           <p style={{ margin: '0 0 28px', color: '#2563eb', fontWeight: 800, fontSize: 16 }}>{event.title}</p>
+          {certificateDelivery?.certificate && (
+            <div style={{ background: certificateDelivery.emailStatus === 'sent' ? '#ecfdf5' : '#fff7ed', border: `1px solid ${certificateDelivery.emailStatus === 'sent' ? '#86efac' : '#fed7aa'}`, borderRadius: 14, padding: '12px 16px', marginBottom: 16, textAlign: 'left' }}>
+              <div style={{ color: certificateDelivery.emailStatus === 'sent' ? '#15803d' : '#9a3412', fontSize: 13, fontWeight: 800, marginBottom: 4 }}>
+                {certificateDelivery.emailStatus === 'sent' ? 'Certificate sent to your email' : 'Certificate generated'}
+              </div>
+              <div style={{ color: '#475569', fontSize: 12, lineHeight: 1.6 }}>
+                Your judge certificate is ready for {judgeEmail}. {certificateDelivery.emailStatus !== 'sent' ? 'Email delivery is pending until the mail service is configured.' : ''}
+              </div>
+              <a href={`/certificate/${encodeURIComponent(certificateDelivery.certificate.id)}`} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', marginTop: 8, color: '#2563eb', fontSize: 12, fontWeight: 800, textDecoration: 'none' }}>
+                Open digital certificate
+              </a>
+            </div>
+          )}
           <div style={{ background: '#f0f7ff', border: '1px solid #bfdbfe', borderRadius: 14, padding: '16px 20px', marginBottom: 28, textAlign: 'left' }}>
             {[
               { label: 'Contestants scored', value: contestants.length },

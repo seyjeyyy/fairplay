@@ -31,6 +31,7 @@ function normalizeCertificate(certificate) {
     eventTitle: certificate.eventTitle || certificate.event_title || metadata.event_title || 'Untitled Event',
     recipientId: String(rawRecipientId || metadata.recipient_id || metadata.participant_id || rawRecipientName).trim(),
     recipientName: rawRecipientName,
+    recipientEmail: certificate.recipientEmail || certificate.recipient_email || metadata.recipient_email || metadata.email || '',
     category: certificate.category || certificate.certificate_type || metadata.category || 'participant',
     placement: certificate.placement ?? metadata.placement ?? null,
     score: certificate.score ?? metadata.score ?? null,
@@ -42,6 +43,9 @@ function normalizeCertificate(certificate) {
     verificationCode: certificate.verificationCode || certificate.verification_code || metadata.verification_code || `FP-${String(certificate.id || Date.now()).slice(-8)}`.toUpperCase(),
     verificationUrl: certificate.verificationUrl || certificate.verification_url || metadata.verification_url || certificate.file_url || '',
     qrValue: certificate.qrValue || certificate.qr_value || metadata.qr_value || '',
+    emailStatus: certificate.emailStatus || certificate.email_status || metadata.email_status || '',
+    emailSentAt: certificate.emailSentAt || certificate.email_sent_at || metadata.email_sent_at || null,
+    emailError: certificate.emailError || certificate.email_error || metadata.email_error || '',
   };
 }
 
@@ -62,6 +66,7 @@ function buildLegacyCertificatePayload(certificate) {
       event_title: certificate.eventTitle,
       recipient_id: certificate.recipientId,
       recipient_name: certificate.recipientName,
+      recipient_email: certificate.recipientEmail,
       category: certificate.category,
       placement: certificate.placement,
       score: certificate.score,
@@ -71,6 +76,9 @@ function buildLegacyCertificatePayload(certificate) {
       verification_code: certificate.verificationCode,
       verification_url: certificate.verificationUrl,
       qr_value: certificate.qrValue,
+      email_status: certificate.emailStatus,
+      email_sent_at: certificate.emailSentAt,
+      email_error: certificate.emailError,
       updated_at: certificate.updatedAt,
     },
     issued_at: certificate.issuedAt,
@@ -89,6 +97,7 @@ function buildCertificatePayload(certificate, legacy = false) {
     event_title: certificate.eventTitle,
     recipient_id: certificate.recipientId,
     recipient_name: certificate.recipientName,
+    recipient_email: certificate.recipientEmail,
     category: certificate.category,
     placement: certificate.placement,
     score: certificate.score,
@@ -100,6 +109,9 @@ function buildCertificatePayload(certificate, legacy = false) {
     verification_code: certificate.verificationCode,
     verification_url: certificate.verificationUrl,
     qr_value: certificate.qrValue,
+    email_status: certificate.emailStatus,
+    email_sent_at: certificate.emailSentAt,
+    email_error: certificate.emailError,
   };
 }
 
@@ -115,9 +127,13 @@ async function tryUpsertCertificates(payload) {
     'template',
     'category',
     'recipient_name',
+    'recipient_email',
     'recipient_id',
     'event_title',
     'updated_at',
+    'email_status',
+    'email_sent_at',
+    'email_error',
   ].some((column) => message.includes(column) || message.includes(`'${column}'`));
 
   if (!schemaMismatch) {
@@ -146,6 +162,7 @@ async function tryFetchCertificates(eventId) {
     'event_title',
     'recipient_id',
     'recipient_name',
+    'recipient_email',
     'category',
     'placement',
     'score',
@@ -155,6 +172,9 @@ async function tryFetchCertificates(eventId) {
     'verification_code',
     'verification_url',
     'qr_value',
+    'email_status',
+    'email_sent_at',
+    'email_error',
   ].some((column) => message.includes(column) || message.includes(`'${column}'`));
 
   if (!schemaMismatch) {
@@ -245,6 +265,7 @@ const useCertificateStore = create(
             eventTitle: event.title,
             recipientId: recipient.id || recipient.name,
             recipientName: recipient.name,
+            recipientEmail: recipient.email || '',
             category: recipient.category || category,
             placement: recipient.placement || null,
             score: recipient.score ?? null,
@@ -256,12 +277,18 @@ const useCertificateStore = create(
             verificationCode,
             verificationUrl,
             qrValue: `${verificationUrl}?certificate=${verificationCode}`,
+            emailStatus: recipient.emailStatus || '',
+            emailSentAt: recipient.emailSentAt || null,
+            emailError: recipient.emailError || '',
           });
         });
 
         set((state) => {
+          const generatedKeys = new Set(
+            nextCertificates.map((certificate) => `${String(certificate.eventId)}:${String(certificate.recipientId)}:${String(certificate.category)}`)
+          );
           const untouched = state.certificates.filter(
-            (certificate) => String(certificate.eventId) !== String(event.id)
+            (certificate) => !generatedKeys.has(`${String(certificate.eventId)}:${String(certificate.recipientId)}:${String(certificate.category)}`)
           );
           return {
             certificates: [...untouched, ...nextCertificates],

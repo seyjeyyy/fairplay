@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import useEventStore from '../../store/eventStore';
 import { isSupabaseConfigured, supabase } from '../../utils/supabaseClient';
+import { issueJudgeCertificate } from '../../services/judgeCertificateService';
 
 const BUBBLE_STYLE = `
   @keyframes floatBubble {
@@ -199,6 +200,7 @@ export default function JudgeLiveScoring() {
   const [submitted, setSubmitted] = useState({}); // { contestantId: true }
   const [activeContestantId, setActiveContestantId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [certificateDelivery, setCertificateDelivery] = useState(null);
 
   useEffect(() => {
     const stored = getStoredJudge();
@@ -327,12 +329,23 @@ export default function JudgeLiveScoring() {
     }
 
     setSaving(false);
-    setSubmitted((prev) => ({ ...prev, [contestantId]: true }));
+    const nextSubmitted = { ...submitted, [contestantId]: true };
+    setSubmitted(nextSubmitted);
 
     // Auto-advance to next unscored contestant
     const contestants = event?.contestants || [];
-    const next = contestants.find((c) => !submitted[c.id] && c.id !== contestantId);
-    if (next) setActiveContestantId(next.id);
+    const next = contestants.find((c) => !nextSubmitted[c.id]);
+    if (next) {
+      setActiveContestantId(next.id);
+    } else {
+      const delivery = await issueJudgeCertificate({
+        event,
+        judgeName: judge.judgeName,
+        judgeEmail: judge.judgeEmail,
+        scoredCount: contestants.length,
+      });
+      setCertificateDelivery(delivery);
+    }
   }
 
   if (!event || !judge) {
@@ -414,7 +427,18 @@ export default function JudgeLiveScoring() {
             <i className="bi bi-check-circle-fill" style={{ fontSize: 48, color: '#16a34a' }} />
             <div>
               <div style={{ fontWeight: 800, color: '#166534', fontSize: 18, marginBottom: 4 }}>All contestants scored!</div>
-              <div style={{ fontSize: 14, color: '#4ade80', marginBottom: 16 }}>Thank you for judging. The organizer will be notified once results are finalized.</div>
+              <div style={{ fontSize: 14, color: '#4ade80', marginBottom: 16 }}>Thank you for judging. Your judge certificate is being prepared.</div>
+              {certificateDelivery?.certificate && (
+                <div style={{ background: '#ffffff', border: '1px solid #bbf7d0', borderRadius: 12, padding: 12, marginBottom: 14, color: '#166534', fontSize: 13 }}>
+                  {certificateDelivery.emailStatus === 'sent'
+                    ? `Digital certificate sent to ${judge.judgeEmail}.`
+                    : `Digital certificate generated for ${judge.judgeEmail}. Email delivery is pending until the mail service is configured.`}
+                  <br />
+                  <a href={`/certificate/${encodeURIComponent(certificateDelivery.certificate.id)}`} target="_blank" rel="noreferrer" style={{ color: '#2563eb', fontWeight: 800, textDecoration: 'none' }}>
+                    Open digital certificate
+                  </a>
+                </div>
+              )}
               <button
                 onClick={() => navigate(`/judge/events`)}
                 style={{

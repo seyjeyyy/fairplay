@@ -307,6 +307,7 @@ alter table public.certificates alter column id type text using id::text;
 alter table public.certificates add column if not exists event_title text;
 alter table public.certificates add column if not exists recipient_id text;
 alter table public.certificates add column if not exists recipient_name text;
+alter table public.certificates add column if not exists recipient_email text;
 alter table public.certificates add column if not exists category text default 'participant';
 alter table public.certificates add column if not exists placement integer;
 alter table public.certificates add column if not exists score numeric(10,2);
@@ -316,6 +317,9 @@ alter table public.certificates add column if not exists notes text;
 alter table public.certificates add column if not exists verification_code text;
 alter table public.certificates add column if not exists verification_url text;
 alter table public.certificates add column if not exists qr_value text;
+alter table public.certificates add column if not exists email_status text;
+alter table public.certificates add column if not exists email_sent_at timestamptz;
+alter table public.certificates add column if not exists email_error text;
 alter table public.certificates add column if not exists updated_at timestamptz default timezone('utc', now());
 update public.certificates
 set
