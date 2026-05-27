@@ -66,6 +66,103 @@ function normalizePublicEvent(event) {
 }
 
 // ─── Animated Particles ───────────────────────────────────────────────────────
+function calculateScoreValue(score) {
+  const criteriaScores = score.criteria_scores || score.criteriaScores || {};
+  const values = Object.values(criteriaScores)
+    .map(value => Number(value))
+    .filter(value => Number.isFinite(value));
+  if (values.length > 0) {
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  }
+
+  const directTotal = Number(score.total_score || score.totalScore);
+  return Number.isFinite(directTotal) ? directTotal : null;
+}
+
+function buildLiveDashboardData({ events = [], judges = [], scores = [], teams = [] }) {
+  const scoredRows = scores
+    .map(score => ({ ...score, scoreValue: calculateScoreValue(score) }))
+    .filter(score => Number.isFinite(score.scoreValue));
+  const scoreValues = scoredRows.map(score => score.scoreValue);
+  const avgScore = scoreValues.length ? scoreValues.reduce((sum, value) => sum + value, 0) / scoreValues.length : null;
+  const lockedCount = scoredRows.filter(score => score.locked).length;
+  const completionRate = scoredRows.length ? Math.round((lockedCount / scoredRows.length) * 100) : null;
+  const eventTitleById = new Map(events.map(event => [String(event.id), event.title || `Event ${event.id}`]));
+
+  const latestScores = [...scoredRows]
+    .sort((left, right) => new Date(right.updated_at || right.created_at || 0).getTime() - new Date(left.updated_at || left.created_at || 0).getTime())
+    .slice(0, 5)
+    .map(score => ({
+      id: score.id,
+      event: score.event_title || eventTitleById.get(String(score.event_id)) || 'Live Event',
+      contestant: score.contestant_name || score.participant_name || (score.team_id ? `Team ${score.team_id}` : `Contestant ${score.contestant_id || score.participant_id || ''}`.trim()),
+      judge: score.judge_name || (score.judge_id ? `Judge ${score.judge_id}` : 'Judge'),
+      value: score.scoreValue,
+    }));
+
+  const seriesMap = new Map();
+  scoredRows.forEach(score => {
+    const label = score.event_title || eventTitleById.get(String(score.event_id));
+    if (!label) return;
+    const next = seriesMap.get(label) || { label, sum: 0, count: 0 };
+    next.sum += score.scoreValue;
+    next.count += 1;
+    seriesMap.set(label, next);
+  });
+  const scoreSeries = Array.from(seriesMap.values())
+    .map(item => ({ label: item.label, avg: item.sum / item.count, count: item.count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  const teamNameById = new Map(teams.map(team => [String(team.id), team.name || `Team ${team.id}`]));
+  const teamAgg = new Map();
+  scoredRows.forEach(score => {
+    const key = score.team_id ? `team:${score.team_id}` : `contestant:${score.contestant_id || score.participant_id || score.contestant_name || score.participant_name || score.id}`;
+    const name = score.team_id ? teamNameById.get(String(score.team_id)) || `Team ${score.team_id}` : score.contestant_name || score.participant_name || 'Contestant';
+    const next = teamAgg.get(key) || { name, sum: 0, count: 0 };
+    next.sum += score.scoreValue;
+    next.count += 1;
+    teamAgg.set(key, next);
+  });
+  const topTeams = Array.from(teamAgg.values())
+    .map(item => ({ name: item.name, avg: item.sum / item.count, count: item.count }))
+    .sort((a, b) => b.avg - a.avg)
+    .slice(0, 3);
+
+  const judgeNameById = new Map(judges.map(judge => [String(judge.id), judge.name || `Judge ${judge.id}`]));
+  const judgeAgg = new Map();
+  scoredRows.forEach(score => {
+    const key = score.judge_id ? String(score.judge_id) : score.judge_name || 'Judge';
+    const next = judgeAgg.get(key) || { name: score.judge_name || judgeNameById.get(key) || `Judge ${key}`, count: 0 };
+    next.count += 1;
+    judgeAgg.set(key, next);
+  });
+  const judgeCounts = Array.from(judgeAgg.values()).sort((a, b) => b.count - a.count).slice(0, 24);
+  const maxJudgeCount = judgeCounts.reduce((max, item) => Math.max(max, item.count), 1);
+  const judgeActivity = judgeCounts.map(item => ({ name: item.name, count: item.count, intensity: item.count / maxJudgeCount }));
+
+  const publicEvents = events.map(normalizePublicEvent).filter(event => event.status !== 'archived' && event.status !== 'rejected');
+  const ongoing = publicEvents.filter(event => event.isOngoing).sort((a, b) => a.startTime - b.startTime).slice(0, 3);
+  const upcoming = publicEvents.filter(event => event.isUpcoming && !event.isOngoing).sort((a, b) => a.startTime - b.startTime).slice(0, 4);
+
+  return {
+    dashboard: {
+      loading: false,
+      error: null,
+      eventsCount: events.length,
+      judgesCount: judges.length,
+      avgScore,
+      completionRate,
+      latestScores,
+      scoreSeries,
+      topTeams,
+      judgeActivity,
+      scoreCount: scoredRows.length,
+    },
+    eventShowcase: { loading: false, ongoing, upcoming },
+  };
+}
+
 function initParticles(canvas) {
   const W = canvas.offsetWidth, H = canvas.offsetHeight;
 
@@ -204,9 +301,11 @@ export default function Landing() {
     judgesCount: 0,
     avgScore: null,
     completionRate: null,
+    latestScores: [],
     scoreSeries: [],
     topTeams: [],
     judgeActivity: [],
+    scoreCount: 0,
   });
   const [eventShowcase, setEventShowcase] = useState({
     loading: true,
@@ -217,6 +316,7 @@ export default function Landing() {
   useEffect(() => {
     let isActive = true;
 
+    let refreshTimer = null;
     const loadDashboard = async () => {
       if (!supabase) {
         if (isActive) {
@@ -233,7 +333,7 @@ export default function Landing() {
       const [eventsRes, judgesRes, scoresRes, teamsRes] = await Promise.all([
         supabase.from('events').select('id,title,type,status,description,location,start_date,end_date,participants,max_participants,metadata'),
         supabase.from('judges').select('id,name'),
-        supabase.from('scores').select('id,total_score,team_id,judge_id,locked,event_title,event_id'),
+        supabase.from('scores').select('id,total_score,criteria_scores,team_id,participant_id,contestant_id,contestant_name,judge_id,judge_name,locked,event_title,event_id,created_at,updated_at'),
         supabase.from('teams').select('id,name'),
       ]);
 
@@ -250,113 +350,41 @@ export default function Landing() {
         return;
       }
 
-      const events = eventsRes.data || [];
-      const judges = judgesRes.data || [];
-      const scores = scoresRes.data || [];
-      const teams = teamsRes.data || [];
-
-      const scoreValues = scores
-        .map(item => Number(item.total_score))
-        .filter(value => Number.isFinite(value));
-
-      const avgScore = scoreValues.length
-        ? scoreValues.reduce((sum, value) => sum + value, 0) / scoreValues.length
-        : null;
-
-      const lockedCount = scores.filter(item => item.locked).length;
-      const completionRate = scores.length ? Math.round((lockedCount / scores.length) * 100) : null;
-
-      const eventTitleById = new Map(events.map(item => [String(item.id), item.title || `Event ${item.id}`]));
-      const seriesMap = new Map();
-      scores.forEach(item => {
-        const eventId = item.event_id ? String(item.event_id) : null;
-        const label = item.event_title || (eventId ? eventTitleById.get(eventId) : null);
-        if (!label) return;
-        const key = label;
-        const value = Number(item.total_score);
-        if (!Number.isFinite(value)) return;
-        const next = seriesMap.get(key) || { label, sum: 0, count: 0 };
-        next.sum += value;
-        next.count += 1;
-        seriesMap.set(key, next);
-      });
-
-      const scoreSeries = Array.from(seriesMap.values())
-        .map(item => ({ label: item.label, avg: item.sum / item.count, count: item.count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 6);
-
-      const teamNameById = new Map(teams.map(item => [String(item.id), item.name || `Team ${item.id}`]));
-      const teamAgg = new Map();
-      scores.forEach(item => {
-        if (!item.team_id) return;
-        const teamId = String(item.team_id);
-        const value = Number(item.total_score);
-        if (!Number.isFinite(value)) return;
-        const next = teamAgg.get(teamId) || { teamId, sum: 0, count: 0 };
-        next.sum += value;
-        next.count += 1;
-        teamAgg.set(teamId, next);
-      });
-
-      const topTeams = Array.from(teamAgg.values())
-        .map(item => ({
-          name: teamNameById.get(item.teamId) || `Team ${item.teamId}`,
-          avg: item.sum / item.count,
-        }))
-        .sort((a, b) => b.avg - a.avg)
-        .slice(0, 3);
-
-      const judgeNameById = new Map(judges.map(item => [String(item.id), item.name || `Judge ${item.id}`]));
-      const judgeAgg = new Map();
-      scores.forEach(item => {
-        if (!item.judge_id) return;
-        const judgeId = String(item.judge_id);
-        const next = judgeAgg.get(judgeId) || { judgeId, count: 0 };
-        next.count += 1;
-        judgeAgg.set(judgeId, next);
-      });
-
-      const judgeCounts = Array.from(judgeAgg.values())
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 24);
-      const maxJudgeCount = judgeCounts.reduce((max, item) => Math.max(max, item.count), 1);
-      const judgeActivity = judgeCounts.map(item => ({
-        name: judgeNameById.get(item.judgeId) || `Judge ${item.judgeId}`,
-        count: item.count,
-        intensity: item.count / maxJudgeCount,
-      }));
-
-      const publicEvents = events
-        .map(normalizePublicEvent)
-        .filter(event => event.status !== 'archived' && event.status !== 'rejected');
-      const ongoing = publicEvents
-        .filter(event => event.isOngoing)
-        .sort((a, b) => a.startTime - b.startTime)
-        .slice(0, 3);
-      const upcoming = publicEvents
-        .filter(event => event.isUpcoming && !event.isOngoing)
-        .sort((a, b) => a.startTime - b.startTime)
-        .slice(0, 4);
-
       if (isActive) {
-        setDashboard({
-          loading: false,
-          error: null,
-          eventsCount: events.length,
-          judgesCount: judges.length,
-          avgScore,
-          completionRate,
-          scoreSeries,
-          topTeams,
-          judgeActivity,
+        const liveData = buildLiveDashboardData({
+          events: eventsRes.data || [],
+          judges: judgesRes.data || [],
+          scores: scoresRes.data || [],
+          teams: teamsRes.data || [],
         });
-        setEventShowcase({ loading: false, ongoing, upcoming });
+        setDashboard(liveData.dashboard);
+        setEventShowcase(liveData.eventShowcase);
       }
     };
 
+    const scheduleReload = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(loadDashboard, 250);
+    };
+
     loadDashboard();
-    return () => { isActive = false; };
+    const intervalId = window.setInterval(loadDashboard, 15000);
+    const channel = supabase
+      ? supabase
+          .channel('fairplay-public-live-dashboard')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, scheduleReload)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, scheduleReload)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'judges' }, scheduleReload)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, scheduleReload)
+          .subscribe()
+      : null;
+
+    return () => {
+      isActive = false;
+      window.clearInterval(intervalId);
+      window.clearTimeout(refreshTimer);
+      if (channel && supabase) supabase.removeChannel(channel);
+    };
   }, []);
 
   useEffect(() => { if (canvasRef.current) return initParticles(canvasRef.current); }, []);
@@ -458,7 +486,7 @@ export default function Landing() {
             <div style={{ width: '100%', maxWidth: 560, borderRadius: 18, padding: 18, background: 'rgba(15,23,42,0.72)', border: '1px solid rgba(148,163,184,0.18)', boxShadow: '0 24px 70px rgba(7,12,24,0.55)', backdropFilter: 'blur(10px)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
                 <div style={{ color: '#e2e8f0', fontWeight: 800, fontSize: 13, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Live Dashboard Overview</div>
-                <div style={{ color: '#94a3b8', fontSize: 11 }}>{dashboard.loading ? 'Loading...' : dashboard.error ? 'Data unavailable' : 'Live'}</div>
+                <div style={{ color: '#94a3b8', fontSize: 11 }}>{dashboard.loading ? 'Loading...' : dashboard.error ? 'Data unavailable' : `Live - ${dashboard.scoreCount || 0} scores`}</div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 14 }}>
@@ -479,21 +507,20 @@ export default function Landing() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12 }}>
                 <div style={{ borderRadius: 14, padding: 12, background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(148,163,184,0.12)' }}>
                   <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 12, marginBottom: 8 }}>Latest Scores</div>
-                  {dashboard.scoreSeries.length ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${dashboard.scoreSeries.length},1fr)`, alignItems: 'end', gap: 6, height: 110 }}>
-                      {dashboard.scoreSeries.map(item => {
-                        const maxAvg = Math.max(...dashboard.scoreSeries.map(series => series.avg));
-                        const height = maxAvg > 0 ? Math.max(6, Math.round((item.avg / maxAvg) * 100)) : 6;
-                        return (
-                          <div key={item.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                            <div style={{ width: '100%', height: `${height}%`, minHeight: 10, borderRadius: 6, background: 'linear-gradient(180deg,#60a5fa,#2563eb)' }} />
-                            <div style={{ fontSize: 9, color: '#94a3b8', textAlign: 'center' }}>{item.label}</div>
+                  {dashboard.latestScores.length ? (
+                    <div style={{ display: 'grid', gap: 7 }}>
+                      {dashboard.latestScores.slice(0, 4).map(item => (
+                        <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: '1px solid rgba(148,163,184,0.12)' }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.contestant}</div>
+                            <div style={{ color: '#94a3b8', fontSize: 9, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.judge} - {item.event}</div>
                           </div>
-                        );
-                      })}
+                          <div style={{ color: '#93c5fd', fontWeight: 900, fontSize: 14 }}>{item.value.toFixed(1)}</div>
+                        </div>
+                      ))}
                     </div>
                   ) : (
-                    <div style={{ color: '#94a3b8', fontSize: 11 }}>No score data yet.</div>
+                    <div style={{ color: '#94a3b8', fontSize: 11 }}>No judge scores yet.</div>
                   )}
                 </div>
 
@@ -504,7 +531,7 @@ export default function Landing() {
                       {dashboard.completionRate !== null ? `${dashboard.completionRate}%` : 'N/A'}
                     </div>
                   </div>
-                  <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 10 }}>Locked scores vs total</div>
+                  <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 10 }}>Locked judge scores vs total</div>
                 </div>
 
                 <div style={{ borderRadius: 14, padding: 12, background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(148,163,184,0.12)', display: 'grid', gap: 8 }}>
