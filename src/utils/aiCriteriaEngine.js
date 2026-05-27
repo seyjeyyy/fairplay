@@ -312,6 +312,35 @@ export function parseUploadedCriteriaTemplate(uploadedCriteria = '') {
   const input = String(uploadedCriteria || '').trim();
   if (!input) return [];
 
+  const pickValue = (source = {}, keys = [], fallback = '') => {
+    for (const key of keys) {
+      if (source[key] !== undefined && source[key] !== null && String(source[key]).trim() !== '') {
+        return source[key];
+      }
+    }
+    const normalizedEntries = Object.entries(source).reduce((acc, [key, value]) => {
+      acc[String(key).toLowerCase().replace(/[^a-z0-9]/g, '')] = value;
+      return acc;
+    }, {});
+    for (const key of keys) {
+      const normalizedKey = String(key).toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (normalizedEntries[normalizedKey] !== undefined && normalizedEntries[normalizedKey] !== null && String(normalizedEntries[normalizedKey]).trim() !== '') {
+        return normalizedEntries[normalizedKey];
+      }
+    }
+    return fallback;
+  };
+
+  const normalizeUploadedCriterion = (criterion = {}, index = 0) => ({
+    id: pickValue(criterion, ['id'], `uploaded-${index + 1}`),
+    name: String(pickValue(criterion, ['name', 'criterionName', 'criterion_name', 'criterion', 'title', 'Criterion name'], `Criterion ${index + 1}`)).trim(),
+    weight: Number(pickValue(criterion, ['weight', 'points', 'percentage', 'scoreWeight', 'Weight'], 0)) || 0,
+    description: String(pickValue(criterion, ['description', 'desc', 'details', 'rubricDescription', 'Description'], '')).trim(),
+    scoringRange: String(pickValue(criterion, ['scoringRange', 'scoring_range', 'range', 'scoreRange', 'Scoring range'], '1-10')).trim(),
+    judgeInstructions: String(pickValue(criterion, ['judgeInstructions', 'judge_instructions', 'instructions', 'judgeGuide', 'Judge instructions'], 'Score based on uploaded rubric.')).trim(),
+    editable: true,
+  });
+
   try {
     const parsed = JSON.parse(input);
     const parsedCriteria = Array.isArray(parsed)
@@ -323,31 +352,52 @@ export function parseUploadedCriteriaTemplate(uploadedCriteria = '') {
           : [];
 
     if (parsedCriteria.length > 0) {
-      return parsedCriteria.map((criterion, index) => ({
-        id: criterion.id || `uploaded-${index + 1}`,
-        name: criterion.name || `Criterion ${index + 1}`,
-        weight: Number(criterion.weight || 0),
-        description: criterion.description || '',
-        scoringRange: criterion.scoringRange || '1-10',
-        judgeInstructions: criterion.judgeInstructions || 'Score based on uploaded rubric.',
-      }));
+      return parsedCriteria.map(normalizeUploadedCriterion);
     }
   } catch (error) {
     // Fallback to plain text parsing below.
   }
 
   const lines = input.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const labelPattern = /^(criterion\s*name|name|description|weight|scoring\s*range|score\s*range|range|judge\s*instructions|judge\s*instruction|instructions?)\s*[:\-]\s*(.+)$/i;
+  const blocks = input
+    .split(/\n\s*\n+/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  const labeledCriteria = blocks.map((block, index) => {
+    const fields = {};
+    block.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).forEach((line) => {
+      const match = line.match(labelPattern);
+      if (!match) return;
+      const key = match[1].toLowerCase().replace(/\s+/g, '');
+      fields[key] = match[2].trim();
+    });
+    if (!Object.keys(fields).length) return null;
+    return normalizeUploadedCriterion({
+      name: fields.criterionname || fields.name,
+      description: fields.description,
+      weight: fields.weight,
+      scoringRange: fields.scoringrange || fields.scorerange || fields.range,
+      judgeInstructions: fields.judgeinstructions || fields.judgeinstruction || fields.instructions || fields.instruction,
+    }, index);
+  }).filter(Boolean);
+
+  if (labeledCriteria.length > 0) {
+    return labeledCriteria;
+  }
+
   return lines.map((line, index) => {
     const delimiter = line.includes('|') ? '|' : ',';
     const parts = line.split(delimiter).map((part) => part.trim());
-    return {
+    return normalizeUploadedCriterion({
       id: `uploaded-${index + 1}`,
-      name: parts[0] || `Criterion ${index + 1}`,
-      weight: Number(parts[1] || Math.floor(100 / Math.max(lines.length, 1))),
-      description: parts[2] || '',
-      scoringRange: parts[3] || '1-10',
-      judgeInstructions: 'Score based on uploaded rubric.',
-    };
+      name: parts[0],
+      weight: parts[1] || Math.floor(100 / Math.max(lines.length, 1)),
+      description: parts[2],
+      scoringRange: parts[3],
+      judgeInstructions: parts[4],
+    }, index);
   });
 }
 
@@ -359,14 +409,20 @@ export function generateCriteriaFromUpload(uploadedCriteria = '', params = {}) {
   const parsedTemplate = parseUploadedCriteriaTemplate(uploadedCriteria);
 
   const baseProfile = parsedTemplate.length > 0
-    ? {
-        profile: 'Template Guided Assessment',
-        criteria: ensureMinimumCriteria(parsedTemplate, 5),
-        scoringMethod: 'Weighted Rubric',
-        tieBreaker: ['Highest weighted total score', 'Highest score in first criterion'],
-        judgeInstructions: 'Use the uploaded rubric as the primary reference and apply scores consistently.',
-      }
+    ? (() => {
+        return {
+          profile: 'Uploaded Criteria Template',
+          criteria: ensureMinimumCriteria(parsedTemplate, 5),
+          scoringMethod: 'Weighted Rubric',
+          tieBreaker: ['Highest weighted total score', 'Highest score in first criterion'],
+          judgeInstructions: 'Use the uploaded ready-made criteria as the official judging rubric.',
+        };
+      })()
     : generateDynamicCriteria(eventName, eventType, description, subEvents);
+
+  if (parsedTemplate.length > 0) {
+    return [baseProfile];
+  }
 
   return createProfileVariants(baseProfile);
 }

@@ -731,7 +731,7 @@ export default function CreateEvent() {
     setCriteriaOptions(normalized);
     setSelectedOptionIndex(0);
     setCriteriaDraft(normalized[0]);
-    success('Uploaded criteria imported. You can now edit it before review.');
+    success(`Uploaded ${normalized[0].criteria.length} criteria. You can now edit them before review.`);
   }, [error, form.description, form.eventType, form.subEvents, form.title, success, uploadedCriteriaName, uploadedCriteriaText]);
 
   useEffect(() => {
@@ -1509,7 +1509,7 @@ export default function CreateEvent() {
                       <div style={eyebrowStyle}>Ready-made criteria</div>
                       <div style={{ color: '#0f172a', fontWeight: 800, marginBottom: 8 }}>Upload or paste template</div>
                       <div style={{ color: '#475569', fontSize: 13, lineHeight: 1.5, marginBottom: 12 }}>
-                        Accepted format: PDF, JSON criteria list, or one criterion per line as Name | Weight | Description.
+                        Minimum is 5 criteria, but FairPlay will import all uploaded criteria even if the template has more. Format: Name | Weight | Description | Scoring range | Judge instructions.
                       </div>
                       <input
                         type="file"
@@ -1526,7 +1526,7 @@ export default function CreateEvent() {
                         value={uploadedCriteriaText}
                         onChange={(event) => setUploadedCriteriaText(event.target.value)}
                         rows={6}
-                        placeholder={'Example:\nCreativity | 20 | Originality and uniqueness\nExecution | 20 | Skill and accuracy'}
+                        placeholder={'Example:\nCreativity | 20 | Originality and uniqueness | 1-10 | Score creative concept, freshness, and theme fit.\nExecution | 20 | Skill and accuracy | 1-10 | Score clean delivery, timing, and control.'}
                         style={{ ...inputStyle, resize: 'vertical', color: '#0f172a', marginBottom: 12 }}
                       />
                       <button
