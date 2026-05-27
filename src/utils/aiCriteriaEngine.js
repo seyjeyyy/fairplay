@@ -341,6 +341,71 @@ export function parseUploadedCriteriaTemplate(uploadedCriteria = '') {
     editable: true,
   });
 
+  const cleanUploadedText = (value = '') => String(value)
+    .replace(/\u00a0/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\s+\n/g, '\n')
+    .replace(/\n\s+/g, '\n')
+    .trim();
+
+  const stripTableIntro = (value = '') => {
+    const normalized = cleanUploadedText(value);
+    const headerPattern = /criteria\s*name\s+weight\s+description\s+scoring\s*range\s+judge\s*instructions?/i;
+    const headerMatch = normalized.match(headerPattern);
+    if (!headerMatch || headerMatch.index === undefined) return normalized;
+    return normalized.slice(headerMatch.index + headerMatch[0].length).trim();
+  };
+
+  const parseScoringRangeAndInstructions = (value = '') => {
+    const text = cleanUploadedText(value);
+    const rangeMatch = text.match(/\b(\d+(?:\.\d+)?\s*(?:-|to)\s*\d+(?:\.\d+)?|out\s+of\s+\d+(?:\.\d+)?|\/\s*\d+(?:\.\d+)?)\b/i);
+    if (!rangeMatch || rangeMatch.index === undefined) {
+      return {
+        description: text,
+        scoringRange: '1-10',
+        judgeInstructions: 'Score based on uploaded rubric.',
+      };
+    }
+
+    return {
+      description: text.slice(0, rangeMatch.index).trim(),
+      scoringRange: rangeMatch[1].replace(/\s+/g, ' ').trim() || '1-10',
+      judgeInstructions: text.slice(rangeMatch.index + rangeMatch[0].length).trim() || 'Score based on uploaded rubric.',
+    };
+  };
+
+  const parseTableTextCriteria = (value = '') => {
+    if (value.includes('|')) return [];
+
+    const tableText = stripTableIntro(value);
+    if (!tableText) return [];
+
+    const rowPattern = /([A-Za-z][A-Za-z0-9/&(),.' -]{1,80}?)\s+(\d+(?:\.\d+)?)\s*%?\s+([\s\S]*?)(?=\s+[A-Za-z][A-Za-z0-9/&(),.' -]{1,80}?\s+\d+(?:\.\d+)?\s*%?\s+|$)/g;
+    const rows = [];
+    let match;
+
+    while ((match = rowPattern.exec(tableText)) !== null) {
+      const name = cleanUploadedText(match[1]);
+      const weight = Number(match[2]);
+      const body = cleanUploadedText(match[3]);
+
+      if (!name || !body || !Number.isFinite(weight)) continue;
+      if (/^(criteria|criterion|weight|description|scoring|range|judge|instruction|ready|made|competition)$/i.test(name)) continue;
+
+      const details = parseScoringRangeAndInstructions(body);
+      rows.push(normalizeUploadedCriterion({
+        id: `uploaded-${rows.length + 1}`,
+        name,
+        weight,
+        description: details.description,
+        scoringRange: details.scoringRange,
+        judgeInstructions: details.judgeInstructions,
+      }, rows.length));
+    }
+
+    return rows.length >= 2 ? rows : [];
+  };
+
   try {
     const parsed = JSON.parse(input);
     const parsedCriteria = Array.isArray(parsed)
@@ -356,6 +421,11 @@ export function parseUploadedCriteriaTemplate(uploadedCriteria = '') {
     }
   } catch (error) {
     // Fallback to plain text parsing below.
+  }
+
+  const tableCriteria = parseTableTextCriteria(input);
+  if (tableCriteria.length > 0) {
+    return tableCriteria;
   }
 
   const lines = input.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
