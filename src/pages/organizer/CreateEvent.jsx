@@ -46,6 +46,19 @@ const EVENT_TYPES = [
 const TOURNAMENT_TYPES = ['tournament', 'sportsfest', 'esports', 'sports'];
 const AUDIENCE_IMPACT_EVENT_TYPES = ['singing', 'pageant', 'dance', 'academic', 'contest'];
 
+function createTimeOptions() {
+  const options = [];
+  for (let hour = 7; hour <= 17; hour += 1) {
+    const value = `${String(hour).padStart(2, '0')}:00`;
+    const displayHour = hour > 12 ? hour - 12 : hour;
+    const suffix = hour >= 12 ? 'PM' : 'AM';
+    options.push({ value, label: `${displayHour}:00 ${suffix}` });
+  }
+  return options;
+}
+
+const TIME_OPTIONS = createTimeOptions();
+
 const BRACKET_TYPES = [
   { value: 'single', label: 'Single Elimination', icon: 'bi-diagram-2', desc: 'One loss and you\'re out. Fast and decisive.' },
   { value: 'round-robin', label: 'Round Robin', icon: 'bi-arrow-repeat', desc: 'Everyone plays everyone. Best record wins.' },
@@ -109,6 +122,17 @@ function getTodayDateInputValue() {
   const today = new Date();
   today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
   return today.toISOString().slice(0, 10);
+}
+
+function combineDateAndTime(date, time) {
+  if (!date) return '';
+  return `${date}T${time || '07:00'}`;
+}
+
+function getDisplayDateTime(date, time) {
+  if (!date) return 'Not set';
+  const option = TIME_OPTIONS.find((entry) => entry.value === time);
+  return `${date} ${option?.label || ''}`.trim();
 }
 
 const emptySubEvent = () => ({
@@ -301,7 +325,9 @@ export default function CreateEvent() {
     substitutesAllowed: true,
     // Schedule
     startDate: '',
+    startTime: '07:00',
     endDate: '',
+    endTime: '17:00',
     registrationDeadline: '',
     // Controls
     enableQR: true,
@@ -355,6 +381,11 @@ export default function CreateEvent() {
       if (name === 'startDate' && value) {
         if (next.endDate && next.endDate < value) next.endDate = '';
         if (next.registrationDeadline && next.registrationDeadline > value) next.registrationDeadline = '';
+      }
+
+      if ((name === 'startDate' || name === 'endDate' || name === 'startTime' || name === 'endTime') &&
+        next.startDate && next.endDate && next.startDate === next.endDate && next.endTime < next.startTime) {
+        next.endTime = next.startTime;
       }
 
       if (name === 'performanceScoringMode') {
@@ -564,6 +595,8 @@ export default function CreateEvent() {
       if (!form.startDate || !form.endDate) return 'Start date and end date are required.';
       if (form.startDate < todayDate) return 'Start date cannot be in the past.';
       if (form.endDate < form.startDate) return 'End date must be on or after the start date.';
+      if (!form.startTime || !form.endTime) return 'Start time and end time are required.';
+      if (form.startDate === form.endDate && form.endTime < form.startTime) return 'End time must be on or after start time.';
       if (form.registrationDeadline) {
         if (form.registrationDeadline < todayDate) return 'Registration deadline cannot be in the past.';
         if (form.registrationDeadline > form.startDate) return 'Registration deadline must be on or before the start date.';
@@ -616,6 +649,7 @@ export default function CreateEvent() {
     form.audienceImpactWeight,
     form.customSportName,
     form.endDate,
+    form.endTime,
     form.esportGame,
     form.eventType,
     form.location,
@@ -624,6 +658,7 @@ export default function CreateEvent() {
     form.minTeamMembers,
     form.registrationDeadline,
     form.startDate,
+    form.startTime,
     form.subEvents,
     form.teamEventCategory,
     form.title,
@@ -888,8 +923,10 @@ export default function CreateEvent() {
         championRule: mode === 'performance' ? form.championRule : null,
         rounds: mode === 'performance' && form.performanceScoringMode === 'multi-round' ? form.rounds : null,
         tournamentFormat: mode === 'tournament' || form.performanceScoringMode === 'head-to-head-bracket' ? form.bracketType : null,
-        startDate: form.startDate,
-        endDate: form.endDate,
+        startDate: combineDateAndTime(form.startDate, form.startTime),
+        endDate: combineDateAndTime(form.endDate, form.endTime),
+        startTime: form.startTime,
+        endTime: form.endTime,
         registrationDeadline: form.registrationDeadline,
         maxParticipants: totalMaxParticipants || Number(form.maxParticipants) || 0,
         sportType: form.teamEventCategory,
@@ -1439,7 +1476,21 @@ export default function CreateEvent() {
                   <h2 style={panelTitleStyle}>When and Where</h2>
                   <div style={gridTwoStyle}>
                     <Field label="Start date"><input name="startDate" type="date" min={todayDate} value={form.startDate} onChange={handleFieldChange} style={inputStyle} /></Field>
+                    <Field label="Start time">
+                      <select name="startTime" value={form.startTime} onChange={handleFieldChange} style={inputStyle}>
+                        {TIME_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </Field>
                     <Field label="End date"><input name="endDate" type="date" min={form.startDate || todayDate} value={form.endDate} onChange={handleFieldChange} style={inputStyle} /></Field>
+                    <Field label="End time">
+                      <select name="endTime" value={form.endTime} onChange={handleFieldChange} style={inputStyle}>
+                        {TIME_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </Field>
                     <Field label="Registration deadline">
                       <input name="registrationDeadline" type="date" min={todayDate} max={form.startDate || undefined} value={form.registrationDeadline} onChange={handleFieldChange} style={inputStyle} />
                     </Field>
@@ -1447,6 +1498,7 @@ export default function CreateEvent() {
                       <Field label="Venue / location"><input name="location" value={form.location} onChange={handleFieldChange} placeholder="e.g. Main gymnasium" style={inputStyle} /></Field>
                     )}
                   </div>
+                  <div style={{ ...helperTextStyle, marginTop: 10 }}>Event time is limited to dropdown choices from 7:00 AM to 5:00 PM.</div>
                 </div>
 
                 {/* ── CONTROLS (shared) ── */}
@@ -1801,7 +1853,7 @@ export default function CreateEvent() {
                     {competitionMode === 'performance' && form.performanceScoringMode === 'multi-round' && <StatTile label="Rounds" value={form.rounds.map((r) => r.name).join(' -> ')} />}
                     <StatTile label="Max participants" value={form.maxParticipants || '—'} />
                     <StatTile label="Venue" value={form.location || 'Not set'} />
-                    <StatTile label="Schedule" value={form.startDate && form.endDate ? `${form.startDate} → ${form.endDate}` : 'Not set'} />
+                    <StatTile label="Schedule" value={form.startDate && form.endDate ? `${getDisplayDateTime(form.startDate, form.startTime)} to ${getDisplayDateTime(form.endDate, form.endTime)}` : 'Not set'} />
                   </div>
                 </div>
 
