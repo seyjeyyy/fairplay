@@ -3,11 +3,13 @@ import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import useEventStore from '../../store/eventStore';
 import useTournamentStore from '../../store/tournamentStore';
+import useAuthStore from '../../store/authStore';
 
 export default function PublicEventView() {
   const { id } = useParams();
   const { events, fetchEvents } = useEventStore();
   const { tournaments, fetchTournaments } = useTournamentStore();
+  const { user } = useAuthStore();
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -31,6 +33,7 @@ export default function PublicEventView() {
 
   const event = events.find((entry) => String(entry.id) === String(id)) || null;
   const tournament = tournaments.find((entry) => String(entry.eventId) === String(id)) || null;
+  const isOrganizerPreview = user?.role === 'organizer' || user?.role === 'admin';
 
   if (!event && !loaded) {
     return (
@@ -102,12 +105,22 @@ export default function PublicEventView() {
             </div>
 
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <Link to={`/events/${id}/brackets`} style={{ flex: 1, minWidth: 220, padding: '12px', borderRadius: 10, background: 'linear-gradient(135deg, #06b6d4, #0084ff)', color: '#000', fontWeight: 700, fontSize: 14, textAlign: 'center', textDecoration: 'none' }}>
-                <i className="bi bi-diagram-3" /> View Brackets
+              <Link to={`/participant/register?eventId=${id}`} style={{ flex: 1, minWidth: 220, padding: '12px', borderRadius: 10, background: 'linear-gradient(135deg, #06b6d4, #0084ff)', color: '#000', fontWeight: 700, fontSize: 14, textAlign: 'center', textDecoration: 'none' }}>
+                <i className="bi bi-person-plus" /> Register Now
               </Link>
+              {tournament ? (
+                <Link to={`/events/${id}/brackets`} style={{ flex: 1, minWidth: 220, padding: '12px', borderRadius: 10, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa', fontWeight: 700, fontSize: 14, textAlign: 'center', textDecoration: 'none' }}>
+                  <i className="bi bi-diagram-3" /> View Brackets
+                </Link>
+              ) : null}
               <Link to={`/events/${id}/leaderboard`} style={{ flex: 1, minWidth: 220, padding: '12px', borderRadius: 10, background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', color: '#10b981', fontWeight: 700, fontSize: 14, textAlign: 'center', textDecoration: 'none' }}>
                 <i className="bi bi-bar-chart-line" /> Leaderboard
               </Link>
+              {isOrganizerPreview ? (
+                <Link to={`/organizer/events/${id}`} style={{ flex: 1, minWidth: 220, padding: '12px', borderRadius: 10, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(148,163,184,0.28)', color: '#e2e8f0', fontWeight: 700, fontSize: 14, textAlign: 'center', textDecoration: 'none' }}>
+                  <i className="bi bi-arrow-left-circle" /> Back to Manage Event
+                </Link>
+              ) : null}
             </div>
           </motion.div>
         </div>

@@ -798,7 +798,7 @@ export default function OrganizerEvents() {
                 onClear={resetFilters}
               />
             ) : viewMode === 'card' ? (
-              <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18 }}>
+              <section style={{ display: 'grid', alignItems: 'stretch', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18 }}>
                 {filteredEvents.map((event, index) => (
                   <motion.article
                     key={event.id}
@@ -812,8 +812,10 @@ export default function OrganizerEvents() {
                       padding: 22,
                       boxShadow: '0 20px 44px rgba(37,99,235,0.08)',
                       display: 'grid',
+                      gridTemplateRows: 'auto 1fr auto',
                       gap: 18,
                       minWidth: 0,
+                      height: '100%',
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
@@ -940,9 +942,9 @@ export default function OrganizerEvents() {
                         <i className="bi bi-gear" />
                         Manage Event
                       </button>
-                      <button onClick={() => navigate(`/events/${event.id}`)} style={{ ...secondaryButtonStyle, flex: '1 1 150px' }}>
-                        <i className="bi bi-eye" />
-                        View Details
+                      <button onClick={() => navigate(`/organizer/events/${event.id}`)} style={{ ...secondaryButtonStyle, flex: '1 1 150px' }}>
+                        <i className="bi bi-arrow-right-circle" />
+                        Continue Setup
                       </button>
                       {event.hasBracket ? (
                         <button onClick={() => navigate(`/organizer/brackets?eventId=${event.id}`)} style={{ ...secondaryButtonStyle, flex: '1 1 150px', borderColor: '#bfdbfe', color: '#1d4ed8', background: '#eff6ff' }}>
@@ -1007,8 +1009,8 @@ export default function OrganizerEvents() {
                               <button onClick={() => navigate(`/organizer/events/${event.id}`)} style={{ ...primaryButtonStyle, padding: '10px 12px', borderRadius: 12, fontSize: 13 }}>
                                 Manage
                               </button>
-                              <button onClick={() => navigate(`/events/${event.id}`)} style={{ ...secondaryButtonStyle, padding: '10px 12px', borderRadius: 12, fontSize: 13 }}>
-                                Details
+                              <button onClick={() => navigate(`/organizer/events/${event.id}`)} style={{ ...secondaryButtonStyle, padding: '10px 12px', borderRadius: 12, fontSize: 13 }}>
+                                Continue
                               </button>
                               {event.hasBracket ? (
                                 <button onClick={() => navigate(`/organizer/brackets?eventId=${event.id}`)} style={{ ...secondaryButtonStyle, padding: '10px 12px', borderRadius: 12, fontSize: 13, borderColor: '#bfdbfe', color: '#1d4ed8', background: '#eff6ff' }}>
