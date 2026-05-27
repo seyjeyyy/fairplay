@@ -3,15 +3,42 @@ import { persist } from 'zustand/middleware';
 import { isSupabaseConfigured, supabase } from '../utils/supabaseClient';
 
 function normalizeTeam(team) {
+  const stats = team.stats && typeof team.stats === 'object' ? team.stats : {};
+  const metadata = (
+    (team.metadata && typeof team.metadata === 'object' && team.metadata) ||
+    (team.teamMetadata && typeof team.teamMetadata === 'object' && team.teamMetadata) ||
+    (stats.metadata && typeof stats.metadata === 'object' && stats.metadata) ||
+    (stats.teamDetails && typeof stats.teamDetails === 'object' && stats.teamDetails) ||
+    {}
+  );
+
   return {
+    ...team,
     id: team.id || `team-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     name: team.name || 'Untitled Team',
     eventId: team.eventId || team.event_id || null,
     members: Array.isArray(team.members) ? team.members : Array.isArray(team.players) ? team.players : [],
     players: Array.isArray(team.players) ? team.players : [],
-    stats: team.stats || { wins: 0, losses: 0, draws: 0, points: 0 },
-    status: team.status || 'active',
+    stats: {
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      points: 0,
+      ...stats,
+    },
+    status: team.status || 'Pending',
+    schoolOrganization: team.schoolOrganization || team.school_or_organization || metadata.schoolOrganization || '',
+    division: team.division || team.team_division || metadata.division || '',
+    representativeType: team.representativeType || team.representative_type || metadata.representativeType || '',
+    teamLeader: team.teamLeader || team.team_leader || metadata.teamLeader || null,
+    coach: team.coach || metadata.coach || null,
+    sportType: team.sportType || team.sport_type || metadata.sportType || '',
+    esportGame: team.esportGame || team.esport_game || metadata.esportGame || '',
+    customSportName: team.customSportName || team.custom_sport_name || metadata.customSportName || '',
+    minParticipants: Number(team.minParticipants || team.min_participants || metadata.minParticipants || 0),
+    maxParticipants: Number(team.maxParticipants || team.max_participants || metadata.maxParticipants || 0),
     createdAt: team.createdAt || team.created_at || new Date().toISOString(),
+    updatedAt: team.updatedAt || team.updated_at || new Date().toISOString(),
   };
 }
 
@@ -59,6 +86,18 @@ const useTeamStore = create(
 
       createTeam: async (data) => {
         const team = normalizeTeam(data);
+        const teamMetadata = {
+          schoolOrganization: team.schoolOrganization,
+          division: team.division,
+          representativeType: team.representativeType,
+          teamLeader: team.teamLeader,
+          coach: team.coach,
+          sportType: team.sportType,
+          esportGame: team.esportGame,
+          customSportName: team.customSportName,
+          minParticipants: team.minParticipants,
+          maxParticipants: team.maxParticipants,
+        };
         set((state) => ({ teams: [team, ...state.teams] }));
 
         if (!isSupabaseConfigured) {
@@ -74,8 +113,11 @@ const useTeamStore = create(
               event_id: team.eventId,
               members: team.members,
               players: team.players,
-              stats: team.stats,
+              stats: { ...team.stats, metadata: teamMetadata },
               status: team.status,
+              coach_name: team.coach?.fullName || '',
+              school_name: team.schoolOrganization,
+              division: team.division,
               created_at: team.createdAt,
             }])
             .select()
@@ -111,14 +153,29 @@ const useTeamStore = create(
         }
 
         try {
+          const teamMetadata = {
+            schoolOrganization: updatedTeam.schoolOrganization,
+            division: updatedTeam.division,
+            representativeType: updatedTeam.representativeType,
+            teamLeader: updatedTeam.teamLeader,
+            coach: updatedTeam.coach,
+            sportType: updatedTeam.sportType,
+            esportGame: updatedTeam.esportGame,
+            customSportName: updatedTeam.customSportName,
+            minParticipants: updatedTeam.minParticipants,
+            maxParticipants: updatedTeam.maxParticipants,
+          };
           const { error } = await supabase.from('teams').upsert([{
             id: updatedTeam.id,
             name: updatedTeam.name,
             event_id: updatedTeam.eventId,
             members: updatedTeam.members,
             players: updatedTeam.players,
-            stats: updatedTeam.stats,
+            stats: { ...updatedTeam.stats, metadata: teamMetadata },
             status: updatedTeam.status,
+            coach_name: updatedTeam.coach?.fullName || '',
+            school_name: updatedTeam.schoolOrganization,
+            division: updatedTeam.division,
             created_at: updatedTeam.createdAt,
           }]);
           if (error) throw error;

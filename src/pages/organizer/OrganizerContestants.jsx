@@ -8,11 +8,12 @@ import useTeamStore from '../../store/teamStore';
 export default function OrganizerContestants() {
   const { user } = useAuthStore();
   const { events, fetchEvents } = useEventStore();
-  const { teams, fetchTeams } = useTeamStore();
+  const { teams, fetchTeams, updateTeam } = useTeamStore();
   const { registrations, fetchRegistrations } = useRegistrationStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [eventFilter, setEventFilter] = useState('');
   const [activeTab, setActiveTab] = useState('teams');
+  const [selectedTeam, setSelectedTeam] = useState(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -159,7 +160,7 @@ export default function OrganizerContestants() {
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 820 }}>
             <thead>
               <tr style={{ textAlign: 'left', color: '#60a5fa', fontSize: 12, background: '#eff6ff' }}>
-                {['Team', 'Event', 'Roster size', 'Status', 'Registered'].map((column) => (
+                {['Team', 'Event', 'Roster size', 'Requirements', 'Status', 'Actions'].map((column) => (
                   <th key={column} style={{ padding: '16px 18px', borderBottom: '1px solid #dbeafe' }}>{column}</th>
                 ))}
               </tr>
@@ -168,18 +169,31 @@ export default function OrganizerContestants() {
               {filteredTeams.length > 0 ? (
                 filteredTeams.map((team) => {
                   const event = events.find((item) => String(item.id) === String(team.eventId));
+                  const rosterSize = (team.players || team.members || []).length;
+                  const min = Number(team.minParticipants || event?.minParticipants || 0);
+                  const max = Number(team.maxParticipants || event?.maxTeamMembers || event?.maxParticipants || 0);
+                  const complete = (!min || rosterSize >= min) && (!max || rosterSize <= max);
                   return (
                     <tr key={team.id} style={{ borderBottom: '1px solid #dbeafe' }}>
                       <td style={{ padding: '16px 18px', color: '#1d4ed8' }}>{team.name}</td>
                       <td style={{ padding: '16px 18px', color: '#1d4ed8' }}>{event?.title || 'Unknown event'}</td>
-                      <td style={{ padding: '16px 18px', color: '#1d4ed8' }}>{(team.members || []).length}</td>
+                      <td style={{ padding: '16px 18px', color: '#1d4ed8' }}>{rosterSize}{max ? ` / ${max}` : ''}</td>
                       <td style={{ padding: '16px 18px' }}>
-                        <span style={{ padding: '6px 10px', borderRadius: 999, background: '#dbeafe', color: '#2563eb', fontSize: 12, fontWeight: 700 }}>
+                        <span style={{ padding: '6px 10px', borderRadius: 999, background: complete ? '#dcfce7' : '#fef3c7', color: complete ? '#15803d' : '#92400e', fontSize: 12, fontWeight: 800 }}>
+                          {complete ? 'Complete' : 'Incomplete'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '16px 18px' }}>
+                        <span style={{ padding: '6px 10px', borderRadius: 999, background: team.status === 'Approved' ? '#dcfce7' : team.status === 'Rejected' ? '#fee2e2' : '#dbeafe', color: team.status === 'Approved' ? '#15803d' : team.status === 'Rejected' ? '#dc2626' : '#2563eb', fontSize: 12, fontWeight: 700 }}>
                           {team.status || 'Confirmed'}
                         </span>
                       </td>
-                      <td style={{ padding: '16px 18px', color: '#60a5fa' }}>
-                        {team.createdAt ? new Date(team.createdAt).toLocaleDateString() : '-'}
+                      <td style={{ padding: '16px 18px' }}>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <button onClick={() => setSelectedTeam(team)} style={miniAction}>View</button>
+                          <button onClick={() => updateTeam(team.id, { status: 'Approved' })} style={{ ...miniAction, color: '#15803d' }}>Approve</button>
+                          <button onClick={() => updateTeam(team.id, { status: 'Rejected' })} style={{ ...miniAction, color: '#dc2626' }}>Reject</button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -229,6 +243,59 @@ export default function OrganizerContestants() {
           </table>
         )}
       </div>
+      {selectedTeam && (
+        <div onClick={() => setSelectedTeam(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.42)', zIndex: 1400, display: 'grid', placeItems: 'center', padding: 20 }}>
+          <div onClick={(event) => event.stopPropagation()} style={{ width: 'min(720px, 100%)', maxHeight: '90vh', overflowY: 'auto', background: '#ffffff', borderRadius: 18, padding: 24, border: '1px solid #bfdbfe', boxShadow: '0 24px 80px rgba(15,23,42,0.22)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 18 }}>
+              <div>
+                <h2 style={{ margin: 0, color: '#0f172a' }}>{selectedTeam.name}</h2>
+                <p style={{ margin: '4px 0 0', color: '#64748b' }}>{selectedTeam.sportType || 'Team event'} - {selectedTeam.status || 'Pending'}</p>
+              </div>
+              <button onClick={() => setSelectedTeam(null)} style={miniAction}>Close</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 18 }}>
+              <Info label="School / Organization" value={selectedTeam.schoolOrganization || '-'} />
+              <Info label="Division" value={selectedTeam.division || '-'} />
+              <Info label="Representative" value={selectedTeam.representativeType || '-'} />
+              <Info label="Members" value={`${(selectedTeam.players || selectedTeam.members || []).length} / ${selectedTeam.maxParticipants || '-'}`} />
+            </div>
+            <h3 style={{ color: '#0f172a', fontSize: 16 }}>Team Leader</h3>
+            <p style={{ color: '#475569' }}>{selectedTeam.teamLeader?.fullName || 'Not provided'}</p>
+            <h3 style={{ color: '#0f172a', fontSize: 16 }}>Coach</h3>
+            <p style={{ color: '#475569' }}>{selectedTeam.coach?.fullName || 'Not provided'}</p>
+            <h3 style={{ color: '#0f172a', fontSize: 16 }}>Members</h3>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {(selectedTeam.players || selectedTeam.members || []).map((member, index) => (
+                <div key={member.id || `${member.fullName}-${index}`} style={{ padding: 12, borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#0f172a' }}>
+                  <strong>{index + 1}. {member.fullName || member.name || member}</strong>
+                  {typeof member === 'object' && (
+                    <div style={{ color: '#64748b', fontSize: 12 }}>Age {member.age || '-'} - ID {member.schoolId || member.school_id || '-'}{member.roleOrPosition ? ` - ${member.roleOrPosition}` : ''}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }
+
+function Info({ label, value }) {
+  return (
+    <div style={{ padding: 12, borderRadius: 12, background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+      <div style={{ color: '#60a5fa', fontSize: 11, fontWeight: 800, textTransform: 'uppercase' }}>{label}</div>
+      <div style={{ color: '#1d4ed8', fontWeight: 800, marginTop: 4 }}>{value}</div>
+    </div>
+  );
+}
+
+const miniAction = {
+  border: '1px solid #bfdbfe',
+  background: '#ffffff',
+  color: '#2563eb',
+  borderRadius: 10,
+  padding: '7px 10px',
+  fontWeight: 800,
+  cursor: 'pointer',
+};

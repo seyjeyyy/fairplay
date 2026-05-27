@@ -4,8 +4,10 @@ import { isSupabaseConfigured, supabase } from '../utils/supabaseClient';
 import { validateRegistrationConflict } from '../services/eventWorkflowService';
 import useEventStore from './eventStore';
 import useTeamStore from './teamStore';
+import { inferTeamLimitConfig, validateTeamMemberCount } from '../utils/teamEventRules';
 
 const initialDetails = { name: '', email: '', phone: '', qrToken: '' };
+const initialRepresentative = { fullName: '', age: '', schoolId: '', phone: '', email: '' };
 const initialLastSubmitted = null;
 
 function createRegistrationId(prefix = 'registration') {
@@ -47,8 +49,18 @@ function normalizeRegistration(registration) {
       registration.individualDetails?.email ||
       registration.individual_details?.email ||
       '',
+    schoolOrganization: registration.schoolOrganization || registration.school_or_organization || metadata.schoolOrganization || '',
+    division: registration.division || registration.team_division || metadata.division || '',
+    representativeType: registration.representativeType || registration.representative_type || metadata.representativeType || '',
+    teamLeader: registration.teamLeader || registration.team_leader || metadata.teamLeader || null,
+    coach: registration.coach || metadata.coach || null,
+    sportType: registration.sportType || registration.sport_type || metadata.sportType || '',
+    esportGame: registration.esportGame || registration.esport_game || metadata.esportGame || '',
+    customSportName: registration.customSportName || registration.custom_sport_name || metadata.customSportName || '',
+    minParticipants: Number(registration.minParticipants || registration.min_participants || metadata.minParticipants || 0),
+    maxParticipants: Number(registration.maxParticipants || registration.max_participants || metadata.maxParticipants || 0),
     category: registration.category || metadata.category || '',
-    status: registration.status || 'submitted',
+    status: registration.status || 'Pending',
     subEventId: registration.subEventId || metadata.subEventId || metadata.sub_event_id || '',
     subEventName: registration.subEventName || metadata.subEventName || metadata.sub_event_name || '',
     participantId:
@@ -80,6 +92,16 @@ function buildRegistrationPayload(registration) {
       subEventId: registration.subEventId || '',
       subEventName: registration.subEventName || '',
       qrToken: registration.individualDetails?.qrToken || '',
+      schoolOrganization: registration.schoolOrganization || '',
+      division: registration.division || '',
+      representativeType: registration.representativeType || '',
+      teamLeader: registration.teamLeader || null,
+      coach: registration.coach || null,
+      sportType: registration.sportType || '',
+      esportGame: registration.esportGame || '',
+      customSportName: registration.customSportName || '',
+      minParticipants: registration.minParticipants || '',
+      maxParticipants: registration.maxParticipants || '',
     },
     created_at: registration.createdAt,
   };
@@ -99,6 +121,11 @@ const useRegistrationStore = create(
       registrationType: 'individual',
       teamName: '',
       roster: [],
+      schoolOrganization: '',
+      division: '',
+      representativeType: 'Team Leader',
+      teamLeader: initialRepresentative,
+      coach: initialRepresentative,
       individualDetails: initialDetails,
       registrations: [],
       status: 'idle',
@@ -107,6 +134,7 @@ const useRegistrationStore = create(
 
       setEvent: (eventId, type) => set({ eventId, registrationType: type || 'individual' }),
       setTeamName: (name) => set({ teamName: name }),
+      setTeamRegistrationDetails: (details) => set((state) => ({ ...state, ...details })),
       addPlayerToRoster: (player) =>
         set((state) => ({
           roster: [...state.roster, { id: crypto.randomUUID(), ...player }],
@@ -303,9 +331,19 @@ const useRegistrationStore = create(
         teamName = '',
         roster = [],
         individualDetails = initialDetails,
+        schoolOrganization = '',
+        division = '',
+        representativeType = '',
+        teamLeader = null,
+        coach = null,
         subEventId = '',
         subEventName = '',
         category = '',
+        sportType = '',
+        esportGame = '',
+        customSportName = '',
+        minParticipants = '',
+        maxParticipants = '',
       }) => {
         set({ status: 'loading', error: null });
 
@@ -318,6 +356,27 @@ const useRegistrationStore = create(
 
           const registrations = await get().fetchRegistrations(eventId);
           const qrToken = createQrToken(registrationType === 'team' ? 'team' : 'participant');
+          const subEvent = (event.subEvents || []).find((entry) => String(entry.id) === String(subEventId)) || null;
+          const teamLimitConfig = inferTeamLimitConfig(event, subEvent);
+          const resolvedMin = Number(minParticipants || teamLimitConfig.min || 0);
+          const resolvedMax = Number(maxParticipants || teamLimitConfig.max || 0);
+
+          if (registrationType === 'team') {
+            if (!teamName.trim()) {
+              throw new Error('Team name is required.');
+            }
+            if (!teamLeader?.fullName?.trim() && !coach?.fullName?.trim()) {
+              throw new Error('Please provide at least one team representative: Team Leader or Coach.');
+            }
+            const countError = validateTeamMemberCount(roster.length, {
+              ...teamLimitConfig,
+              min: resolvedMin,
+              max: resolvedMax,
+            });
+            if (countError) {
+              throw new Error(countError);
+            }
+          }
 
           const conflict = validateRegistrationConflict({
             registrations,
@@ -342,9 +401,19 @@ const useRegistrationStore = create(
             const team = await useTeamStore.getState().createTeam({
               name: teamName,
               eventId,
-              members: roster.map((player) => player.name),
+              members: roster.map((player) => player.fullName || player.name),
               players: roster,
-              status: 'active',
+              status: 'Pending',
+              schoolOrganization,
+              division,
+              representativeType,
+              teamLeader,
+              coach,
+              sportType: sportType || teamLimitConfig.sportType,
+              esportGame: esportGame || teamLimitConfig.esportGame,
+              customSportName: customSportName || teamLimitConfig.customSportName,
+              minParticipants: resolvedMin,
+              maxParticipants: resolvedMax,
             });
 
             if (!team) {
@@ -358,9 +427,22 @@ const useRegistrationStore = create(
               name: teamName,
               type: 'team',
               teamName,
-              captain: individualDetails.name,
-              email: individualDetails.email,
-              phone: individualDetails.phone,
+              captain: teamLeader?.fullName || individualDetails.name,
+              email: teamLeader?.email || coach?.email || individualDetails.email,
+              phone: teamLeader?.phone || coach?.phone || individualDetails.phone,
+              schoolOrganization,
+              division,
+              representativeType,
+              teamLeader,
+              coach,
+              teamMembers: roster,
+              totalMembers: roster.length,
+              registrationStatus: 'Pending',
+              sportType: sportType || teamLimitConfig.sportType,
+              esportGame: esportGame || teamLimitConfig.esportGame,
+              customSportName: customSportName || teamLimitConfig.customSportName,
+              minParticipants: resolvedMin,
+              maxParticipants: resolvedMax,
               subEventId,
               subEventName,
               qrToken,
@@ -391,6 +473,16 @@ const useRegistrationStore = create(
             teamName,
             roster,
             individualDetails: { ...initialDetails, ...individualDetails, qrToken },
+            schoolOrganization,
+            division,
+            representativeType,
+            teamLeader,
+            coach,
+            sportType: sportType || teamLimitConfig.sportType,
+            esportGame: esportGame || teamLimitConfig.esportGame,
+            customSportName: customSportName || teamLimitConfig.customSportName,
+            minParticipants: resolvedMin,
+            maxParticipants: resolvedMax,
             participantId,
             participantName,
             email: individualDetails.email || '',
@@ -403,8 +495,19 @@ const useRegistrationStore = create(
               subEventName,
               captain: individualDetails.name || '',
               phone: individualDetails.phone || '',
+              schoolOrganization,
+              division,
+              representativeType,
+              teamLeader,
+              coach,
+              totalMembers: roster.length,
+              sportType: sportType || teamLimitConfig.sportType,
+              esportGame: esportGame || teamLimitConfig.esportGame,
+              customSportName: customSportName || teamLimitConfig.customSportName,
+              minParticipants: resolvedMin,
+              maxParticipants: resolvedMax,
             },
-            status: 'submitted',
+            status: registrationType === 'team' ? 'Pending' : 'submitted',
           });
 
           set((state) => ({
@@ -427,6 +530,11 @@ const useRegistrationStore = create(
           registrationType: 'individual',
           teamName: '',
           roster: [],
+          schoolOrganization: '',
+          division: '',
+          representativeType: 'Team Leader',
+          teamLeader: initialRepresentative,
+          coach: initialRepresentative,
           individualDetails: initialDetails,
           status: 'idle',
           error: null,

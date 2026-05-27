@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import useEventStore from '../../store/eventStore';
 import useRegistrationStore from '../../store/registrationStore';
 import { ensureEventTournamentAutomation } from '../../services/automationService';
+import {
+  getParticipantLimitMessage,
+  inferTeamLimitConfig,
+  validateTeamMemberCount,
+} from '../../utils/teamEventRules';
 
 const STORAGE_KEY = 'fairplay_participant_identity';
+const emptyPerson = { fullName: '', age: '', schoolId: '', phone: '', email: '' };
+const emptyMember = { fullName: '', age: '', schoolId: '', phone: '', email: '', roleOrPosition: '' };
 
 function getStoredParticipant() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); }
@@ -23,6 +30,7 @@ function getSubEventName(subEvent) {
 }
 
 export default function PublicParticipantRegister() {
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const eventId = searchParams.get('eventId');
   const { fetchEvents } = useEventStore();
@@ -30,7 +38,9 @@ export default function PublicParticipantRegister() {
 
   const [phase, setPhase] = useState('loading');
   const [event, setEvent] = useState(null);
-  const [regType, setRegType] = useState('individual'); // individual | team
+  const forceTeamRegistration = location.pathname.includes('register-team');
+  const forceIndividualRegistration = location.pathname.includes('register-individual');
+  const [regType, setRegType] = useState(forceTeamRegistration ? 'team' : 'individual'); // individual | team
   const [selectedSubEventId, setSelectedSubEventId] = useState('');
 
   // Shared fields (individual name = captain name for team)
@@ -40,6 +50,14 @@ export default function PublicParticipantRegister() {
 
   // Team-only field
   const [teamName, setTeamName] = useState('');
+  const [schoolOrganization, setSchoolOrganization] = useState('');
+  const [division, setDivision] = useState('');
+  const [representativeType, setRepresentativeType] = useState('Team Leader');
+  const [teamLeader, setTeamLeader] = useState(emptyPerson);
+  const [coach, setCoach] = useState(emptyPerson);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [memberDraft, setMemberDraft] = useState(emptyMember);
+  const [editingMemberId, setEditingMemberId] = useState(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -59,6 +77,12 @@ export default function PublicParticipantRegister() {
         setSelectedSubEventId(String(firstSubEvent.id));
         setRegType(String(firstSubEvent.format || '').toLowerCase() === 'team' ? 'team' : 'individual');
       }
+      if (forceTeamRegistration) {
+        setRegType('team');
+      }
+      if (forceIndividualRegistration) {
+        setRegType('individual');
+      }
 
       const stored = getStoredParticipant();
       if (stored?.eventId === eventId && stored?.name) {
@@ -73,7 +97,7 @@ export default function PublicParticipantRegister() {
     }
     init();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventId]);
+  }, [eventId, forceIndividualRegistration, forceTeamRegistration]);
 
   // ── Submit ──
   async function handleSubmit(e) {
@@ -104,20 +128,77 @@ export default function PublicParticipantRegister() {
         setSubmitting(false);
         return;
       }
+      const limitConfig = inferTeamLimitConfig(currentEvent, selectedSubEvent);
+
+      if (effectiveRegType === 'team') {
+        const hasLeader = Boolean(teamLeader.fullName.trim());
+        const hasCoach = Boolean(coach.fullName.trim());
+        if (!hasLeader && !hasCoach) {
+          setErrorMsg('Please provide at least one team representative: Team Leader or Coach.');
+          setSubmitting(false);
+          return;
+        }
+        if (hasLeader && (!teamLeader.age || !teamLeader.schoolId.trim())) {
+          setErrorMsg('Team Leader age and school ID are required.');
+          setSubmitting(false);
+          return;
+        }
+        const leaderContactError = hasLeader ? validateContactDraft(teamLeader, 'Team Leader') : '';
+        const coachContactError = hasCoach ? validateContactDraft(coach, 'Coach') : '';
+        if (leaderContactError || coachContactError) {
+          setErrorMsg(leaderContactError || coachContactError);
+          setSubmitting(false);
+          return;
+        }
+        if (limitConfig.coachRequired && !coach.fullName.trim()) {
+          setErrorMsg('Coach information is required for this event.');
+          setSubmitting(false);
+          return;
+        }
+        const countError = validateTeamMemberCount(teamMembers.length, limitConfig);
+        if (countError) {
+          setErrorMsg(countError);
+          setSubmitting(false);
+          return;
+        }
+        const incompleteMember = teamMembers.find((member) => !member.fullName.trim() || !member.age || !member.schoolId.trim());
+        if (incompleteMember) {
+          setErrorMsg('Every team member must have a full name, age, and school ID.');
+          setSubmitting(false);
+          return;
+        }
+      }
 
       const registration = await submitPublicRegistration({
         eventId,
         registrationType: effectiveRegType,
         teamName: teamName.trim(),
-        roster: [],
+        roster: effectiveRegType === 'team'
+          ? teamMembers.map((member) => ({
+              ...member,
+              name: member.fullName,
+              role_or_position: member.roleOrPosition,
+              is_team_leader: teamLeader.fullName.trim().toLowerCase() === member.fullName.trim().toLowerCase(),
+            }))
+          : [],
         individualDetails: {
           name: name.trim(),
           email: email.toLowerCase().trim(),
           phone: phone.trim(),
         },
+        schoolOrganization: schoolOrganization.trim(),
+        division: division.trim(),
+        representativeType,
+        teamLeader: teamLeader.fullName.trim() ? teamLeader : null,
+        coach: coach.fullName.trim() ? coach : null,
         subEventId: selectedSubEvent?.id || '',
         subEventName: getSubEventName(selectedSubEvent),
         category: getSubEventName(selectedSubEvent) || currentEvent?.eventType || '',
+        sportType: limitConfig.sportType,
+        esportGame: limitConfig.esportGame,
+        customSportName: limitConfig.customSportName,
+        minParticipants: limitConfig.min,
+        maxParticipants: limitConfig.max,
       });
 
       const refreshedEvent = useEventStore.getState().getEventById(eventId);
@@ -151,10 +232,74 @@ export default function PublicParticipantRegister() {
     ? (selectedSubEventFormat === 'team' ? 'team' : 'individual')
     : isTournamentLike
       ? 'team'
-      : regType;
-  const showTypeToggle = selectableSubEvents.length === 0 && !isTournamentLike;
+      : forceTeamRegistration
+        ? 'team'
+        : forceIndividualRegistration
+          ? 'individual'
+          : regType;
+  const showTypeToggle = selectableSubEvents.length === 0 && !isTournamentLike && !forceTeamRegistration && !forceIndividualRegistration;
   const showMissingSubEventsNotice = selectableSubEvents.length === 0 && isTournamentLike;
   const venueText = selectedSubEvent?.venue || event?.location || 'Venue TBD';
+  const teamLimitConfig = inferTeamLimitConfig(event || {}, selectedSubEvent || null);
+  const memberCountError = validateTeamMemberCount(teamMembers.length, teamLimitConfig);
+  const membersRemaining = Math.max(0, teamLimitConfig.min - teamMembers.length);
+  const maxReached = teamMembers.length >= teamLimitConfig.max;
+  const positionOptions = teamLimitConfig.positions || [];
+
+  function updatePerson(setter, field, value) {
+    setter((current) => ({ ...current, [field]: value }));
+  }
+
+  function validateContactDraft(person, label) {
+    if (person.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(person.email)) return `${label} email must be valid.`;
+    if (person.phone && !/^[+0-9()\-\s]{7,20}$/.test(person.phone)) return `${label} phone number must be valid.`;
+    return '';
+  }
+
+  function handleSaveMember() {
+    const draft = {
+      ...memberDraft,
+      fullName: memberDraft.fullName.trim(),
+      schoolId: memberDraft.schoolId.trim(),
+      email: memberDraft.email.trim(),
+      phone: memberDraft.phone.trim(),
+      roleOrPosition: memberDraft.roleOrPosition.trim(),
+    };
+    if (!draft.fullName || !draft.age || !draft.schoolId) {
+      setErrorMsg('Team member full name, age, and school ID are required.');
+      return;
+    }
+    const contactError = validateContactDraft(draft, 'Team member');
+    if (contactError) {
+      setErrorMsg(contactError);
+      return;
+    }
+    if (!editingMemberId && maxReached) {
+      setErrorMsg('Maximum number of players reached.');
+      return;
+    }
+    setTeamMembers((current) => {
+      if (editingMemberId) {
+        return current.map((member) => (member.id === editingMemberId ? { ...draft, id: editingMemberId } : member));
+      }
+      return [...current, { ...draft, id: `member-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` }];
+    });
+    setMemberDraft(emptyMember);
+    setEditingMemberId(null);
+    setErrorMsg('');
+  }
+
+  function handleEditMember(member) {
+    setMemberDraft({
+      fullName: member.fullName || member.name || '',
+      age: member.age || '',
+      schoolId: member.schoolId || member.school_id || '',
+      phone: member.phone || member.phone_number || '',
+      email: member.email || '',
+      roleOrPosition: member.roleOrPosition || member.role_or_position || '',
+    });
+    setEditingMemberId(member.id);
+  }
 
   /* ─── Loading ─── */
   if (phase === 'loading') {
@@ -354,25 +499,170 @@ export default function PublicParticipantRegister() {
                 <input type="text" value={teamName} onChange={(e) => setTeamName(e.target.value)}
                   placeholder="e.g. Team Alpha" style={inputStyle} disabled={submitting} required />
               </div>
+              <div>
+                <label style={labelStyle}>School / Organization <Req /></label>
+                <input value={schoolOrganization} onChange={(e) => setSchoolOrganization(e.target.value)} placeholder="School or organization name" style={inputStyle} disabled={submitting} required />
+              </div>
+              <div>
+                <label style={labelStyle}>Division / Category <Opt /></label>
+                <input value={division} onChange={(e) => setDivision(e.target.value)} placeholder="e.g. Junior, Senior, Men's, Women's" style={inputStyle} disabled={submitting} />
+              </div>
+
+              <div style={teamInfoBox}>
+                <strong>{teamLimitConfig.label}</strong>
+                <span>Members added: {teamMembers.length} / {teamLimitConfig.max}</span>
+                <span>Minimum required: {teamLimitConfig.min}</span>
+                {membersRemaining > 0 && <span style={{ color: '#b45309' }}>You need to add at least {membersRemaining} more player{membersRemaining === 1 ? '' : 's'}.</span>}
+                {maxReached && <span style={{ color: '#047857' }}>Maximum number of players reached.</span>}
+                {memberCountError && teamMembers.length > 0 && <span style={{ color: '#dc2626' }}>{memberCountError}</span>}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: 4, borderRadius: 14, background: '#f1f5f9' }}>
+                {['Team Leader', 'Coach'].map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setRepresentativeType(type)}
+                    style={{
+                      padding: '10px',
+                      borderRadius: 11,
+                      border: 'none',
+                      background: representativeType === type ? '#ffffff' : 'transparent',
+                      color: representativeType === type ? '#2563eb' : '#64748b',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {type} submits
+                  </button>
+                ))}
+              </div>
+
               <div style={{ padding: 14, borderRadius: 14, background: '#f8fafc', border: '1px solid #e2e8f0', display: 'grid', gap: 12 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  Captain / Leader
-                </span>
+                <span style={sectionTitleStyle}>Team Leader Information</span>
                 <div>
                   <label style={labelStyle}>Full Name <Req /></label>
-                  <input type="text" value={name} onChange={(e) => setName(e.target.value)}
-                    placeholder="Juan dela Cruz" style={{ ...inputStyle, background: '#fff' }} disabled={submitting} required />
+                  <input type="text" value={teamLeader.fullName} onChange={(e) => updatePerson(setTeamLeader, 'fullName', e.target.value)}
+                    placeholder="Juan dela Cruz" style={{ ...inputStyle, background: '#fff' }} disabled={submitting} />
+                </div>
+                <div style={responsiveTwoColumnGrid}>
+                  <div>
+                    <label style={labelStyle}>Age <Req /></label>
+                    <input type="number" min="1" value={teamLeader.age} onChange={(e) => updatePerson(setTeamLeader, 'age', e.target.value)} style={{ ...inputStyle, background: '#fff' }} disabled={submitting} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>School ID <Req /></label>
+                    <input value={teamLeader.schoolId} onChange={(e) => updatePerson(setTeamLeader, 'schoolId', e.target.value)} style={{ ...inputStyle, background: '#fff' }} disabled={submitting} />
+                  </div>
                 </div>
                 <div>
-                  <label style={labelStyle}>Email Address <Req /></label>
-                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                    placeholder="juan@email.com" style={{ ...inputStyle, background: '#fff' }} disabled={submitting} required />
+                  <label style={labelStyle}>Phone Number <Opt /></label>
+                  <input type="tel" value={teamLeader.phone} onChange={(e) => updatePerson(setTeamLeader, 'phone', e.target.value)} placeholder="09XX XXX XXXX" style={{ ...inputStyle, background: '#fff' }} disabled={submitting} />
                 </div>
                 <div>
-                  <label style={labelStyle}>Contact Number <Opt /></label>
-                  <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-                    placeholder="09XX XXX XXXX" style={{ ...inputStyle, background: '#fff' }} disabled={submitting} />
+                  <label style={labelStyle}>Email Address <Opt /></label>
+                  <input type="email" value={teamLeader.email} onChange={(e) => updatePerson(setTeamLeader, 'email', e.target.value)} placeholder="leader@email.com" style={{ ...inputStyle, background: '#fff' }} disabled={submitting} />
                 </div>
+              </div>
+
+              <div style={{ padding: 14, borderRadius: 14, background: '#f8fafc', border: '1px solid #e2e8f0', display: 'grid', gap: 12 }}>
+                <span style={sectionTitleStyle}>Coach Information <Opt /></span>
+                <div>
+                  <label style={labelStyle}>Full Name</label>
+                  <input value={coach.fullName} onChange={(e) => updatePerson(setCoach, 'fullName', e.target.value)} placeholder="Coach full name" style={{ ...inputStyle, background: '#fff' }} disabled={submitting} />
+                </div>
+                <div style={responsiveTwoColumnGrid}>
+                  <div>
+                    <label style={labelStyle}>Age <Opt /></label>
+                    <input type="number" min="1" value={coach.age} onChange={(e) => updatePerson(setCoach, 'age', e.target.value)} style={{ ...inputStyle, background: '#fff' }} disabled={submitting} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>School / Staff ID <Opt /></label>
+                    <input value={coach.schoolId} onChange={(e) => updatePerson(setCoach, 'schoolId', e.target.value)} style={{ ...inputStyle, background: '#fff' }} disabled={submitting} />
+                  </div>
+                </div>
+                <div>
+                  <label style={labelStyle}>Phone Number <Opt /></label>
+                  <input type="tel" value={coach.phone} onChange={(e) => updatePerson(setCoach, 'phone', e.target.value)} style={{ ...inputStyle, background: '#fff' }} disabled={submitting} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Email Address <Opt /></label>
+                  <input type="email" value={coach.email} onChange={(e) => updatePerson(setCoach, 'email', e.target.value)} style={{ ...inputStyle, background: '#fff' }} disabled={submitting} />
+                </div>
+              </div>
+
+              <div style={{ padding: 14, borderRadius: 14, background: '#ffffff', border: '1px solid #bfdbfe', display: 'grid', gap: 12 }}>
+                <span style={sectionTitleStyle}>{editingMemberId ? 'Edit Team Member' : 'Add Team Member'}</span>
+                <div>
+                  <label style={labelStyle}>Full Name <Req /></label>
+                  <input value={memberDraft.fullName} onChange={(e) => setMemberDraft((current) => ({ ...current, fullName: e.target.value }))} style={inputStyle} disabled={submitting} />
+                </div>
+                <div style={responsiveTwoColumnGrid}>
+                  <div>
+                    <label style={labelStyle}>Age <Req /></label>
+                    <input type="number" min="1" value={memberDraft.age} onChange={(e) => setMemberDraft((current) => ({ ...current, age: e.target.value }))} style={inputStyle} disabled={submitting} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>School ID <Req /></label>
+                    <input value={memberDraft.schoolId} onChange={(e) => setMemberDraft((current) => ({ ...current, schoolId: e.target.value }))} style={inputStyle} disabled={submitting} />
+                  </div>
+                </div>
+                <div style={responsiveTwoColumnGrid}>
+                  <div>
+                    <label style={labelStyle}>Phone <Opt /></label>
+                    <input value={memberDraft.phone} onChange={(e) => setMemberDraft((current) => ({ ...current, phone: e.target.value }))} style={inputStyle} disabled={submitting} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Email <Opt /></label>
+                    <input type="email" value={memberDraft.email} onChange={(e) => setMemberDraft((current) => ({ ...current, email: e.target.value }))} style={inputStyle} disabled={submitting} />
+                  </div>
+                </div>
+                <div>
+                  <label style={labelStyle}>Position / Role <Opt /></label>
+                  <input
+                    list="team-position-options"
+                    value={memberDraft.roleOrPosition}
+                    onChange={(e) => setMemberDraft((current) => ({ ...current, roleOrPosition: e.target.value }))}
+                    placeholder={positionOptions[0] || 'Player'}
+                    style={inputStyle}
+                    disabled={submitting}
+                  />
+                  <datalist id="team-position-options">
+                    {positionOptions.map((option) => <option key={option} value={option} />)}
+                  </datalist>
+                </div>
+                <button type="button" onClick={handleSaveMember} disabled={submitting || (!editingMemberId && maxReached)} style={secondaryActionButton}>
+                  <i className={editingMemberId ? 'bi bi-check2-circle' : 'bi bi-plus-circle'} />
+                  {editingMemberId ? 'Save Member' : 'Add Member'}
+                </button>
+              </div>
+
+              {teamMembers.length > 0 && (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {teamMembers.map((member, index) => (
+                    <div key={member.id} style={memberRowStyle}>
+                      <div>
+                        <strong>{index + 1}. {member.fullName}</strong>
+                        <div style={{ color: '#64748b', fontSize: 12 }}>
+                          Age {member.age} - ID {member.schoolId}{member.roleOrPosition ? ` - ${member.roleOrPosition}` : ''}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button type="button" onClick={() => handleEditMember(member)} style={smallButtonStyle}>Edit</button>
+                        <button type="button" onClick={() => setTeamMembers((current) => current.filter((entry) => entry.id !== member.id))} style={{ ...smallButtonStyle, color: '#dc2626' }}>Remove</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={reviewBoxStyle}>
+                <strong>Review before submitting</strong>
+                <span>Team: {teamName || 'Not set'}</span>
+                <span>Representative: {representativeType}</span>
+                <span>Team Leader: {teamLeader.fullName || 'Not provided'}</span>
+                <span>Coach: {coach.fullName || 'Not provided'}</span>
+                <span>Status after submission: Pending</span>
               </div>
             </div>
           )}
@@ -389,7 +679,7 @@ export default function PublicParticipantRegister() {
               submitting ||
               (selectableSubEvents.length > 0 && !selectedSubEventId) ||
               (effectiveRegType === 'individual' && (!name.trim() || !email.trim())) ||
-              (effectiveRegType === 'team' && (!teamName.trim() || !name.trim() || !email.trim()))
+              (effectiveRegType === 'team' && (!teamName.trim() || !schoolOrganization.trim() || Boolean(memberCountError)))
             }
             style={{
               width: '100%', padding: '14px', borderRadius: 14, border: 'none',
@@ -440,8 +730,83 @@ const card = {
   borderRadius: 24,
   padding: 32,
   width: '100%',
-  maxWidth: 440,
+  maxWidth: 760,
   boxShadow: '0 20px 60px rgba(37,99,235,0.12)',
+  boxSizing: 'border-box',
+};
+
+const responsiveTwoColumnGrid = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+  gap: 10,
+};
+
+const sectionTitleStyle = {
+  fontSize: 12,
+  fontWeight: 800,
+  color: '#2563eb',
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+};
+
+const teamInfoBox = {
+  display: 'grid',
+  gap: 4,
+  padding: 14,
+  borderRadius: 14,
+  background: '#eff6ff',
+  border: '1px solid #bfdbfe',
+  color: '#1d4ed8',
+  fontSize: 13,
+};
+
+const secondaryActionButton = {
+  width: '100%',
+  padding: '12px 14px',
+  borderRadius: 12,
+  border: '1px solid #bfdbfe',
+  background: '#eff6ff',
+  color: '#1d4ed8',
+  fontWeight: 800,
+  cursor: 'pointer',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+};
+
+const smallButtonStyle = {
+  border: '1px solid #dbeafe',
+  background: '#ffffff',
+  color: '#2563eb',
+  borderRadius: 10,
+  padding: '7px 10px',
+  fontWeight: 800,
+  cursor: 'pointer',
+};
+
+const memberRowStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  gap: 10,
+  alignItems: 'center',
+  padding: 12,
+  borderRadius: 12,
+  background: '#f8fafc',
+  border: '1px solid #e2e8f0',
+  color: '#0f172a',
+  flexWrap: 'wrap',
+};
+
+const reviewBoxStyle = {
+  display: 'grid',
+  gap: 6,
+  padding: 14,
+  borderRadius: 14,
+  background: '#f0fdf4',
+  border: '1px solid #bbf7d0',
+  color: '#166534',
+  fontSize: 13,
 };
 
 const datePill = {

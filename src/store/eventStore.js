@@ -70,6 +70,13 @@ function buildEventMetadata(event) {
     judgeInstructions: event.judgeInstructions,
     judgeSessions: event.judgeSessions,
     subEvents: event.subEvents,
+    sportType: event.sportType,
+    esportGame: event.esportGame,
+    customSportName: event.customSportName,
+    minParticipants: event.minParticipants,
+    maxTeamMembers: event.maxTeamMembers,
+    coachRequired: event.coachRequired,
+    substitutesAllowed: event.substitutesAllowed,
     competitionMode: event.competitionMode,
     bracketType: event.bracketType,
     performanceScoringMode: event.performanceScoringMode,
@@ -118,6 +125,13 @@ function normalizeEvent(event, index = 0) {
       id: normalizedId,
       type,
     }),
+    sportType: source.sportType || source.sport_type || source.event_category || metadata.sportType || '',
+    esportGame: source.esportGame || source.esport_game || metadata.esportGame || '',
+    customSportName: source.customSportName || source.custom_sport_name || metadata.customSportName || '',
+    minParticipants: Number(source.minParticipants || source.min_participants || metadata.minParticipants || 0),
+    maxTeamMembers: Number(source.maxTeamMembers || source.max_team_members || metadata.maxTeamMembers || 0),
+    coachRequired: Boolean(source.coachRequired ?? source.coach_required ?? metadata.coachRequired),
+    substitutesAllowed: source.substitutesAllowed ?? source.substitutes_allowed ?? metadata.substitutesAllowed ?? true,
     approvalWorkflow: Array.isArray(source.approvalWorkflow) && source.approvalWorkflow.length > 0
       ? source.approvalWorkflow
       : Array.isArray(source.approval_workflow) && source.approval_workflow.length > 0

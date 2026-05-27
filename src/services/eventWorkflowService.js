@@ -86,6 +86,13 @@ export function normalizeSubEvents(parentEvent) {
         bracketType,
         tournamentFormat: subEvent.tournamentFormat || bracketType,
         maxParticipants: subEvent.maxParticipants || subEvent.max_participants || '',
+        minParticipants: subEvent.minParticipants || subEvent.min_participants || '',
+        maxTeamMembers: subEvent.maxTeamMembers || subEvent.max_team_members || '',
+        sportType: subEvent.sportType || subEvent.sport_type || subEvent.category || '',
+        esportGame: subEvent.esportGame || subEvent.esport_game || '',
+        customSportName: subEvent.customSportName || subEvent.custom_sport_name || '',
+        coachRequired: Boolean(subEvent.coachRequired ?? subEvent.coach_required),
+        substitutesAllowed: subEvent.substitutesAllowed ?? subEvent.substitutes_allowed ?? true,
         venue: subEvent.venue || '',
         criteriaMode: subEvent.criteriaMode || 'ai-assisted',
         participants: Number(subEvent.participants || 0),
@@ -108,6 +115,13 @@ export function normalizeSubEvents(parentEvent) {
     bracketType: subEvent.bracketType || 'single',
     tournamentFormat: subEvent.bracketType || 'single',
     maxParticipants: '',
+    minParticipants: '',
+    maxTeamMembers: '',
+    sportType: subEvent.title,
+    esportGame: '',
+    customSportName: '',
+    coachRequired: false,
+    substitutesAllowed: true,
     venue: '',
     criteriaMode: 'ai-assisted',
     participants: 0,
@@ -142,8 +156,12 @@ export function validateRegistrationConflict({ registrations = [], nextRegistrat
         (player) =>
           player.name?.trim().toLowerCase() === registration.individualDetails?.name?.trim().toLowerCase()
       );
+    const sameTeamName =
+      registration.registrationType === 'team' &&
+      nextRegistration.registrationType === 'team' &&
+      registration.teamName?.trim().toLowerCase() === nextRegistration.teamName?.trim().toLowerCase();
 
-    return sameEvent && (samePerson || teamContainsPerson || individualInsideTeam);
+    return sameEvent && (samePerson || teamContainsPerson || individualInsideTeam || sameTeamName);
   });
 
   if (existingSameEvent) {

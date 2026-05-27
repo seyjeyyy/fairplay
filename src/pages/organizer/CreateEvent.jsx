@@ -13,6 +13,12 @@ import {
 import { getBusinessActorId } from '../../utils/identity';
 import { requestEventDescription } from '../../services/criteriaApiService';
 import { ensureEventTournamentAutomation } from '../../services/automationService';
+import {
+  ESPORTS_GAMES,
+  TEAM_EVENT_CATEGORIES,
+  getParticipantLimitMessage,
+  getTeamLimitPreset,
+} from '../../utils/teamEventRules';
 
 const STEPS = [
   { id: 1, title: 'Event Setup', icon: 'bi bi-card-checklist' },
@@ -105,6 +111,13 @@ const emptySubEvent = () => ({
   category: 'Indoor Sport',
   format: 'individual',
   tournamentFormat: 'single',
+  sportType: 'Basketball',
+  esportGame: '',
+  customSportName: '',
+  minParticipants: 5,
+  maxTeamMembers: 12,
+  coachRequired: false,
+  substitutesAllowed: true,
   maxParticipants: '',
   venue: '',
 });
@@ -126,6 +139,13 @@ function normalizeSubEventForSave(subEvent) {
     ...subEvent,
     category,
     tournamentFormat: subEvent.tournamentFormat || 'single',
+    sportType: subEvent.sportType || category,
+    esportGame: subEvent.esportGame || '',
+    customSportName: subEvent.customSportName?.trim() || '',
+    minParticipants: Number(subEvent.minParticipants || 1),
+    maxTeamMembers: Number(subEvent.maxTeamMembers || subEvent.maxParticipants || 1),
+    coachRequired: Boolean(subEvent.coachRequired),
+    substitutesAllowed: subEvent.substitutesAllowed !== false,
     maxParticipants: subEvent.maxParticipants || '',
     venue: subEvent.venue?.trim() || '',
   };
@@ -233,6 +253,13 @@ export default function CreateEvent() {
     maxParticipants: '',
     rounds: defaultRounds(),
     subEvents: [emptySubEvent()],
+    teamEventCategory: 'Basketball',
+    esportGame: '',
+    customSportName: '',
+    minTeamMembers: 5,
+    maxTeamMembers: 12,
+    coachRequired: false,
+    substitutesAllowed: true,
     // Schedule
     startDate: '',
     endDate: '',
@@ -266,6 +293,16 @@ export default function CreateEvent() {
     () => `${window.location.origin}${judgeAssets.accessLink}`,
     [judgeAssets.accessLink]
   );
+  const teamLimitPreview = useMemo(
+    () => getTeamLimitPreset({
+      sportType: form.teamEventCategory,
+      esportGame: form.esportGame,
+      customSportName: form.customSportName,
+      minParticipants: form.minTeamMembers,
+      maxParticipants: form.maxTeamMembers,
+    }),
+    [form.customSportName, form.esportGame, form.maxTeamMembers, form.minTeamMembers, form.teamEventCategory]
+  );
 
   const handleFieldChange = useCallback((event) => {
     const { name, value, type, checked } = event.target;
@@ -292,6 +329,20 @@ export default function CreateEvent() {
         } else {
           next.scoringType = 'weighted';
           next.championRule = 'final-round-highest-score';
+        }
+      }
+
+      if (name === 'teamEventCategory' || name === 'esportGame') {
+        const sportType = name === 'teamEventCategory' ? value : next.teamEventCategory;
+        const esportGame = name === 'esportGame' ? value : next.esportGame;
+        const preset = getTeamLimitPreset({
+          sportType,
+          esportGame,
+          customSportName: next.customSportName,
+        });
+        if (sportType !== 'Other Team Sports' && !(sportType === 'Esports' && esportGame === 'Other')) {
+          next.minTeamMembers = preset.min;
+          next.maxTeamMembers = preset.max;
         }
       }
 
@@ -368,13 +419,27 @@ export default function CreateEvent() {
       ...current,
       subEvents: current.subEvents.map((subEvent) =>
         subEvent.id === subEventId
-          ? {
+          ? (() => {
+            const next = {
               ...subEvent,
               [field]: value,
               ...(field === 'name' && !subEvent.categoryCustom
                 ? { category: suggestSubEventCategory(value) }
                 : {}),
+            };
+            if (field === 'sportType' || field === 'esportGame') {
+              const preset = getTeamLimitPreset({
+                sportType: field === 'sportType' ? value : next.sportType,
+                esportGame: field === 'esportGame' ? value : next.esportGame,
+                customSportName: next.customSportName,
+              });
+              if (next.sportType !== 'Other Team Sports' && !(next.sportType === 'Esports' && next.esportGame === 'Other')) {
+                next.minParticipants = preset.min;
+                next.maxTeamMembers = preset.max;
+              }
             }
+            return next;
+          })()
           : subEvent
       ),
     }));
@@ -426,6 +491,12 @@ export default function CreateEvent() {
       const mode = TOURNAMENT_TYPES.includes(form.eventType) ? 'tournament' : 'performance';
       if (mode === 'tournament') {
         if (!form.maxParticipants) return 'Set the maximum number of teams/participants.';
+        if (form.teamEventCategory === 'Other Team Sports' && !form.customSportName.trim()) return 'Type the custom team sport name.';
+        if (form.teamEventCategory === 'Esports' && !form.esportGame) return 'Choose the esports game.';
+        if (form.teamEventCategory === 'Esports' && form.esportGame === 'Other' && !form.customSportName.trim()) return 'Type the custom esports game name.';
+        if (Number(form.minTeamMembers || 0) < 1 || Number(form.maxTeamMembers || 0) < Number(form.minTeamMembers || 0)) {
+          return 'Set a valid minimum and maximum team member limit.';
+        }
         if (form.eventType === 'sportsfest') {
           const validSubEvents = form.subEvents.filter((subEvent) => subEvent.name.trim());
           if (validSubEvents.length === 0) return 'Add at least one sub-event for a sports fest.';
@@ -434,6 +505,9 @@ export default function CreateEvent() {
           }
           if (validSubEvents.some((subEvent) => Number(subEvent.maxParticipants || 0) < 1)) {
             return 'Set maximum participants for each sub-event.';
+          }
+          if (validSubEvents.some((subEvent) => subEvent.format === 'team' && Number(subEvent.maxTeamMembers || 0) < Number(subEvent.minParticipants || 0))) {
+            return 'Set valid team member limits for each team sub-event.';
           }
         }
       }
@@ -454,12 +528,18 @@ export default function CreateEvent() {
   }, [
     criteriaDraft.criteria.length,
     form.description,
+    form.customSportName,
     form.endDate,
+    form.esportGame,
     form.eventType,
     form.location,
+    form.maxParticipants,
+    form.maxTeamMembers,
+    form.minTeamMembers,
     form.registrationDeadline,
     form.startDate,
     form.subEvents,
+    form.teamEventCategory,
     form.title,
     todayDate,
     totalWeight,
@@ -669,6 +749,13 @@ export default function CreateEvent() {
         endDate: form.endDate,
         registrationDeadline: form.registrationDeadline,
         maxParticipants: totalMaxParticipants || Number(form.maxParticipants) || 0,
+        sportType: form.teamEventCategory,
+        esportGame: form.teamEventCategory === 'Esports' ? form.esportGame : '',
+        customSportName: form.customSportName,
+        minParticipants: Number(form.minTeamMembers || teamLimitPreview.min || 0),
+        maxTeamMembers: Number(form.maxTeamMembers || teamLimitPreview.max || 0),
+        coachRequired: form.coachRequired,
+        substitutesAllowed: form.substitutesAllowed,
         enableQR: form.enableQR,
         enableCertificates: form.enableCertificates,
         attendanceTracking: form.attendanceTracking,
@@ -695,7 +782,7 @@ export default function CreateEvent() {
     } finally {
       setLoading(false);
     }
-  }, [competitionMode, createEvent, criteriaDraft, error, form, judgeAssets, navigate, success, user?.id, validateStep]);
+  }, [competitionMode, createEvent, criteriaDraft, error, form, judgeAssets, navigate, success, teamLimitPreview.max, teamLimitPreview.min, user?.id, validateStep]);
 
   const sectionCardStyle = {
     background: '#ffffff',
@@ -861,6 +948,47 @@ export default function CreateEvent() {
                       <Field label="Maximum teams / participants">
                         <input name="maxParticipants" type="number" min="2" value={form.maxParticipants} onChange={handleFieldChange} placeholder="e.g. 8 teams" style={inputStyle} />
                       </Field>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 14 }}>
+                        <Field label="Team sport category">
+                          <select name="teamEventCategory" value={form.teamEventCategory} onChange={handleFieldChange} style={inputStyle}>
+                            {TEAM_EVENT_CATEGORIES.map((category) => (
+                              <option key={category} value={category}>{category}</option>
+                            ))}
+                          </select>
+                        </Field>
+                        {form.teamEventCategory === 'Esports' && (
+                          <Field label="Esports game">
+                            <select name="esportGame" value={form.esportGame} onChange={handleFieldChange} style={inputStyle}>
+                              <option value="">Select game</option>
+                              {ESPORTS_GAMES.map((game) => (
+                                <option key={game} value={game}>{game}</option>
+                              ))}
+                            </select>
+                          </Field>
+                        )}
+                        {(form.teamEventCategory === 'Other Team Sports' || form.esportGame === 'Other') && (
+                          <Field label={form.teamEventCategory === 'Esports' ? 'Custom game name' : 'Custom sport name'}>
+                            <input name="customSportName" value={form.customSportName} onChange={handleFieldChange} placeholder="Type custom name" style={inputStyle} />
+                          </Field>
+                        )}
+                        <Field label="Minimum players">
+                          <input name="minTeamMembers" type="number" min="1" value={form.minTeamMembers} onChange={handleFieldChange} style={inputStyle} />
+                        </Field>
+                        <Field label="Maximum players">
+                          <input name="maxTeamMembers" type="number" min="1" value={form.maxTeamMembers} onChange={handleFieldChange} style={inputStyle} />
+                        </Field>
+                      </div>
+                      <div style={{ ...infoPanelStyle, marginTop: 14, display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                        <span>{getParticipantLimitMessage(teamLimitPreview)}</span>
+                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: '#334155', fontWeight: 700, fontSize: 13 }}>
+                          <input name="coachRequired" type="checkbox" checked={form.coachRequired} onChange={handleFieldChange} />
+                          Coach required
+                        </label>
+                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: '#334155', fontWeight: 700, fontSize: 13 }}>
+                          <input name="substitutesAllowed" type="checkbox" checked={form.substitutesAllowed} onChange={handleFieldChange} />
+                          Substitutes allowed
+                        </label>
+                      </div>
                     </div>
 
                     {/* Sub-events for Sports Fest */}
@@ -901,6 +1029,38 @@ export default function CreateEvent() {
                                 <Field label="Max participants">
                                   <input type="number" min="1" value={subEvent.maxParticipants || ''} onChange={(e) => updateSubEvent(subEvent.id, 'maxParticipants', e.target.value)} placeholder="e.g. 16" style={inputStyle} />
                                 </Field>
+                                {subEvent.format === 'team' && (
+                                  <>
+                                    <Field label="Team sport">
+                                      <select value={subEvent.sportType || 'Basketball'} onChange={(e) => updateSubEvent(subEvent.id, 'sportType', e.target.value)} style={inputStyle}>
+                                        {TEAM_EVENT_CATEGORIES.map((category) => (
+                                          <option key={category} value={category}>{category}</option>
+                                        ))}
+                                      </select>
+                                    </Field>
+                                    {subEvent.sportType === 'Esports' && (
+                                      <Field label="Esports game">
+                                        <select value={subEvent.esportGame || ''} onChange={(e) => updateSubEvent(subEvent.id, 'esportGame', e.target.value)} style={inputStyle}>
+                                          <option value="">Select game</option>
+                                          {ESPORTS_GAMES.map((game) => (
+                                            <option key={game} value={game}>{game}</option>
+                                          ))}
+                                        </select>
+                                      </Field>
+                                    )}
+                                    {(subEvent.sportType === 'Other Team Sports' || subEvent.esportGame === 'Other') && (
+                                      <Field label={subEvent.sportType === 'Esports' ? 'Custom game' : 'Custom sport'}>
+                                        <input value={subEvent.customSportName || ''} onChange={(e) => updateSubEvent(subEvent.id, 'customSportName', e.target.value)} placeholder="Type custom name" style={inputStyle} />
+                                      </Field>
+                                    )}
+                                    <Field label="Min team members">
+                                      <input type="number" min="1" value={subEvent.minParticipants || ''} onChange={(e) => updateSubEvent(subEvent.id, 'minParticipants', e.target.value)} style={inputStyle} />
+                                    </Field>
+                                    <Field label="Max team members">
+                                      <input type="number" min="1" value={subEvent.maxTeamMembers || ''} onChange={(e) => updateSubEvent(subEvent.id, 'maxTeamMembers', e.target.value)} style={inputStyle} />
+                                    </Field>
+                                  </>
+                                )}
                                 <Field label="Venue">
                                   <input value={subEvent.venue || ''} onChange={(e) => updateSubEvent(subEvent.id, 'venue', e.target.value)} placeholder="e.g. Brgy. Olympia Court" style={inputStyle} />
                                 </Field>
