@@ -297,7 +297,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div style={{ ...cardStyle, minWidth: 0 }}>
+          <div style={{ ...cardStyle, minWidth: 0, overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
               <h3 style={cardTitleStyle}><Calendar size={16} /> All Organizer Events</h3>
               <div style={{ display: 'flex', gap: 12 }}>
@@ -414,7 +414,7 @@ const statsGridStyle = {
 
 const mainDashboardGridStyle = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))',
+  gridTemplateColumns: '1fr',
   gap: 20,
   alignItems: 'start',
   width: '100%',
@@ -422,8 +422,10 @@ const mainDashboardGridStyle = {
 
 const sidePanelStackStyle = {
   display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))',
   gap: 20,
   minWidth: 0,
+  alignItems: 'stretch',
 };
 
 const cardTitleStyle = {
