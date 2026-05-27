@@ -40,10 +40,10 @@ function fitFontSize(text, baseSize, compactSize, maxLength) {
 
 function certificateTitleSize(title, isJudgeCertificate) {
   const length = String(title || '').length;
-  if (isJudgeCertificate) return length > 26 ? 42 : 46;
-  if (length > 30) return 48;
-  if (length > 24) return 54;
-  return 60;
+  if (isJudgeCertificate) return length > 24 ? 38 : 42;
+  if (length > 24) return 40;
+  if (length > 18) return 44;
+  return 50;
 }
 
 function isImageTemplate(template) {
@@ -237,10 +237,10 @@ const CertificateRenderer = forwardRef(function CertificateRenderer({ certificat
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(7,48,71,0.03) 1px, transparent 1px)', backgroundSize: '24px 24px', zIndex: 0, pointerEvents: 'none' }} />
 
         {/* ── Left: text ── */}
-        <div style={{ flex: '1 1 auto', minWidth: 0, padding: '22px 22px 18px 40px', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
+        <div style={{ flex: '1 1 auto', minWidth: 0, padding: '22px 8px 18px 40px', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
 
           {/* Certificate title — same line, no separator */}
-          <div style={{ marginBottom: 14, paddingLeft: 8, overflow: 'hidden', width: '100%' }}>
+          <div style={{ marginBottom: 14, paddingLeft: 8, width: '100%' }}>
             <div style={{
               color: '#073047',
               fontFamily: '"Brush Script MT","Segoe Script",cursive',
@@ -250,8 +250,6 @@ const CertificateRenderer = forwardRef(function CertificateRenderer({ certificat
               textShadow: '2px 3px 0 rgba(246,201,69,0.28)',
               whiteSpace: 'nowrap',
               maxWidth: '100%',
-              overflow: 'hidden',
-              textOverflow: 'clip',
               paddingLeft: 4,
             }}>
               {certTitle}
