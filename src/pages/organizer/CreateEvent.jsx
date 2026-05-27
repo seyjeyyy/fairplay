@@ -834,6 +834,7 @@ export default function CreateEvent() {
         0
       );
       const mode = TOURNAMENT_TYPES.includes(form.eventType) ? 'tournament' : 'performance';
+      const audienceImpactEnabled = mode === 'performance' && Boolean(form.audienceImpact);
       const createdEvent = await createEvent({
         organizer_id: getBusinessActorId(user),
         organizerAuthProfileId: user?.id || '',
@@ -869,11 +870,11 @@ export default function CreateEvent() {
         enableQR: form.enableQR,
         enableCertificates: form.enableCertificates,
         attendanceTracking: form.attendanceTracking,
-        audienceImpact: form.audienceImpact,
-        audienceImpactEnabled: mode === 'performance' && form.audienceImpact,
-        audienceImpactWeight: mode === 'performance' && form.audienceImpact ? Number(form.audienceImpactWeight || 10) : 0,
-        audienceVotingOpen: mode === 'performance' && form.audienceImpact && Boolean(form.audienceVotingOpen),
-        audienceQrToken: `audience-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        audienceImpact: audienceImpactEnabled,
+        audienceImpactEnabled,
+        audienceImpactWeight: audienceImpactEnabled ? Number(form.audienceImpactWeight || 10) : 0,
+        audienceVotingOpen: audienceImpactEnabled && Boolean(form.audienceVotingOpen),
+        audienceQrToken: audienceImpactEnabled ? `audience-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` : '',
         subEvents: subEventsForSave,
         criteria: criteriaDraft.criteria,
         judgeProfile: criteriaDraft.profile,
@@ -888,11 +889,16 @@ export default function CreateEvent() {
       if (!createdEvent) {
         throw new Error('Event was not saved to Supabase.');
       }
-      await ensureEventTournamentAutomation(createdEvent, []);
+      try {
+        await ensureEventTournamentAutomation(createdEvent, []);
+      } catch (automationError) {
+        console.warn('Event was created, but automation setup did not finish:', automationError?.message || automationError);
+      }
       success('Event created successfully.');
       navigate('/organizer/events');
     } catch (submissionError) {
-      error('Failed to create event.');
+      console.error('Failed to create event:', submissionError);
+      error(`Failed to create event${submissionError?.message ? `: ${submissionError.message}` : '.'}`);
     } finally {
       setLoading(false);
     }

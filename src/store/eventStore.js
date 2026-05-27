@@ -195,6 +195,49 @@ function normalizeEvent(event, index = 0) {
   };
 }
 
+function getMissingColumnName(error) {
+  const message = error?.message || '';
+  const patterns = [
+    /Could not find the '([^']+)' column/i,
+    /column "([^"]+)" of relation/i,
+    /column "([^"]+)" does not exist/i,
+    /'([^']+)' column/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+
+  return null;
+}
+
+async function saveEventPayload(payload, { select = false, mode = 'upsert' } = {}) {
+  let currentPayload = { ...payload };
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const query = mode === 'insert'
+      ? supabase.from('events').insert([currentPayload])
+      : supabase.from('events').upsert([currentPayload]);
+    const { data, error } = select ? await query.select() : await query;
+
+    if (!error) return { data, error: null };
+
+    const missingColumn = getMissingColumnName(error);
+    if (!missingColumn || !(missingColumn in currentPayload)) {
+      return { data: null, error };
+    }
+
+    const { [missingColumn]: _removed, ...nextPayload } = currentPayload;
+    currentPayload = nextPayload;
+  }
+
+  return {
+    data: null,
+    error: new Error('Unable to save event after checking database columns.'),
+  };
+}
+
 const initialEvents = isSupabaseConfigured
   ? []
   : mockEvents.map((event, index) => normalizeEvent(event, index));
@@ -294,10 +337,6 @@ const useEventStore = create(
             approval_workflow: normalizedEvent.approvalWorkflow,
             external_judge_invites: normalizedEvent.externalJudgeInvites,
             audience_attendance: normalizedEvent.audienceAttendance,
-            audience_impact_enabled: normalizedEvent.audienceImpactEnabled,
-            audience_impact_weight: normalizedEvent.audienceImpactWeight,
-            audience_voting_open: normalizedEvent.audienceVotingOpen,
-            audience_qr_token: normalizedEvent.audienceQrToken,
             attendance_tracking: normalizedEvent.attendanceTracking,
             tournament_format: normalizedEvent.tournamentFormat,
             status: normalizedEvent.status,
@@ -309,7 +348,7 @@ const useEventStore = create(
             metadata,
             created_at: normalizedEvent.created_at || normalizedEvent.createdAt,
           };
-          const { data, error } = await supabase.from('events').upsert([payload]).select();
+          const { data, error } = await saveEventPayload(payload, { select: true, mode: 'insert' });
           if (error) throw error;
 
           const createdEvent = normalizeEvent(data?.[0] || normalizedEvent, 0);
@@ -343,7 +382,7 @@ const useEventStore = create(
         if (isSupabaseConfigured) {
           try {
           const metadata = buildEventMetadata(updatedEvent);
-          const { error } = await supabase.from('events').upsert([{
+          const { error } = await saveEventPayload({
               id: updatedEvent.id,
               title: updatedEvent.title,
               type: updatedEvent.type,
@@ -358,10 +397,6 @@ const useEventStore = create(
               approval_workflow: updatedEvent.approvalWorkflow,
               external_judge_invites: updatedEvent.externalJudgeInvites,
               audience_attendance: updatedEvent.audienceAttendance,
-              audience_impact_enabled: updatedEvent.audienceImpactEnabled,
-              audience_impact_weight: updatedEvent.audienceImpactWeight,
-              audience_voting_open: updatedEvent.audienceVotingOpen,
-              audience_qr_token: updatedEvent.audienceQrToken,
               attendance_tracking: updatedEvent.attendanceTracking,
               tournament_format: updatedEvent.tournamentFormat,
               status: updatedEvent.status,
@@ -372,7 +407,7 @@ const useEventStore = create(
               location: updatedEvent.location,
               enable_certificates: updatedEvent.enableCertificates,
               metadata,
-            }]);
+            });
             if (error) throw error;
           } catch (error) {
             console.error('Error updating event:', error.message);
