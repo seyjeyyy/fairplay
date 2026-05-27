@@ -63,9 +63,21 @@ export default function OrganizerDashboard() {
   ];
 
   const quickActions = [
-    { icon: 'bi bi-eye', label: 'View' },
-    { icon: 'bi bi-pencil-square', label: 'Edit' },
-    { icon: 'bi bi-bar-chart-line', label: 'Scores' },
+    {
+      icon: 'bi bi-eye',
+      label: 'View',
+      action: (event) => navigate(`/organizer/events/${event.id}`),
+    },
+    {
+      icon: 'bi bi-pencil-square',
+      label: 'Edit',
+      action: (event) => navigate(`/organizer/events/${event.id}`),
+    },
+    {
+      icon: 'bi bi-bar-chart-line',
+      label: 'Scores',
+      action: (event) => navigate(`/organizer/scoring?eventId=${event.id}`),
+    },
   ];
 
   const cardStyle = {
@@ -379,6 +391,7 @@ export default function OrganizerDashboard() {
                     {quickActions.map((button) => (
                       <button
                         key={button.label}
+                        onClick={() => button.action(event)}
                         aria-label={button.label}
                         style={{
                           background: '#f8fafc',

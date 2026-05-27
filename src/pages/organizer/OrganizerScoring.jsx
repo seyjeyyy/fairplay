@@ -19,8 +19,9 @@ export default function OrganizerScoring() {
   const { events, fetchEvents } = useEventStore();
   const { success } = useNotificationStore();
   const { fetchScores, getLiveFeed, calculateLeaderboard } = useScoreStore();
-  const [selectedEvent, setSelectedEvent] = useState(searchParams.get('eventId') || '');
-  const [activeTab, setActiveTab] = useState('live');
+  const eventIdFromUrl = searchParams.get('eventId');
+  const [selectedEvent, setSelectedEvent] = useState(eventIdFromUrl || '');
+  const [activeTab, setActiveTab] = useState('leaderboard');
 
   useEffect(() => {
     if (user?.id) {
@@ -50,21 +51,23 @@ export default function OrganizerScoring() {
   };
 
   return (
-    <DashboardLayout title="Live Scoring" subtitle="Monitor actual judge submissions, rankings, and finalization status">
-      <div style={{ marginBottom: 24 }}>
-        <select
-          value={selectedEvent}
-          onChange={(event) => setSelectedEvent(event.target.value)}
-          style={selectStyle}
-        >
-          <option value="">Select an event</option>
-          {activeEvents.map((event) => (
-            <option key={event.id} value={event.id}>
-              {event.title}
-            </option>
-          ))}
-        </select>
-      </div>
+    <DashboardLayout title={selected ? `Rankings · ${selected.title}` : 'Live Scoring'} subtitle={selected ? `Event ID: ${selected.id}` : 'Monitor actual judge submissions, rankings, and finalization status'}>
+      {!eventIdFromUrl && (
+        <div style={{ marginBottom: 24 }}>
+          <select
+            value={selectedEvent}
+            onChange={(event) => setSelectedEvent(event.target.value)}
+            style={selectStyle}
+          >
+            <option value="">Select an event</option>
+            {activeEvents.map((event) => (
+              <option key={event.id} value={event.id}>
+                {event.title}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {selected ? (
         <>
