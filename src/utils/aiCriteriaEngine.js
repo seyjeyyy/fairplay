@@ -377,31 +377,49 @@ export function parseUploadedCriteriaTemplate(uploadedCriteria = '') {
   const parseTableTextCriteria = (value = '') => {
     if (value.includes('|')) return [];
 
-    const tableText = stripTableIntro(value);
+    const tableText = stripTableIntro(value)
+      .replace(/\b(Total\s+Weight|General\s+Judge\s+Instruction|Score\s+Meaning|Prepared\s+for)\b[\s\S]*$/i, '')
+      .trim();
     if (!tableText) return [];
 
-    const rowPattern = /([A-Za-z][A-Za-z0-9/&(),.' -]{1,80}?)\s+(\d+(?:\.\d+)?)\s*%?\s+([\s\S]*?)(?=\s+[A-Za-z][A-Za-z0-9/&(),.' -]{1,80}?\s+\d+(?:\.\d+)?\s*%?\s+|$)/g;
+    const rowStartPattern = /(?:^|[\n.;])\s*([A-Z][A-Za-z0-9/&(),' -]{1,60}?)\s+(\d+(?:\.\d+)?)\s*%?\s+(?=(Measures|Evaluates|Assesses|Rates|Scores?|Judges?|Observe|Check|Consider|Accuracy|Creativity|Overall)\b)/gi;
+    const rowStarts = [];
+    let startMatch;
+
+    while ((startMatch = rowStartPattern.exec(tableText)) !== null) {
+      const prefix = startMatch[0].match(/^[\n.;\s]*/)?.[0] || '';
+      const startIndex = startMatch.index + prefix.length;
+      const name = cleanUploadedText(startMatch[1]);
+      const weight = Number(startMatch[2]);
+
+      if (!name || !Number.isFinite(weight)) continue;
+      if (/^(criteria|criterion|weight|description|scoring|range|judge|instruction|ready|made|competition|total)$/i.test(name)) continue;
+
+      rowStarts.push({
+        startIndex,
+        bodyStart: rowStartPattern.lastIndex,
+        name,
+        weight,
+      });
+    }
+
     const rows = [];
-    let match;
+    rowStarts.forEach((rowStart, index) => {
+      const nextStart = rowStarts[index + 1]?.startIndex ?? tableText.length;
+      const body = cleanUploadedText(tableText.slice(rowStart.bodyStart, nextStart));
 
-    while ((match = rowPattern.exec(tableText)) !== null) {
-      const name = cleanUploadedText(match[1]);
-      const weight = Number(match[2]);
-      const body = cleanUploadedText(match[3]);
-
-      if (!name || !body || !Number.isFinite(weight)) continue;
-      if (/^(criteria|criterion|weight|description|scoring|range|judge|instruction|ready|made|competition)$/i.test(name)) continue;
+      if (!body) return;
 
       const details = parseScoringRangeAndInstructions(body);
       rows.push(normalizeUploadedCriterion({
         id: `uploaded-${rows.length + 1}`,
-        name,
-        weight,
+        name: rowStart.name,
+        weight: rowStart.weight,
         description: details.description,
         scoringRange: details.scoringRange,
         judgeInstructions: details.judgeInstructions,
       }, rows.length));
-    }
+    });
 
     return rows.length >= 2 ? rows : [];
   };
