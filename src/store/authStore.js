@@ -597,12 +597,14 @@ const useAuthStore = create(
             const seedUsers = SEED_USERS.map(({ password, ...entry }) => entry);
             const seedEmails = new Set(seedUsers.map((entry) => entry.email.toLowerCase()));
             const customUsers = state.users.filter((entry) => !seedEmails.has(String(entry.email || '').toLowerCase()));
+            const users = [
+              ...customUsers,
+              ...seedUsers,
+            ];
 
             return {
-              users: [
-                ...customUsers,
-                ...seedUsers,
-              ],
+              users,
+              organizerApplications: buildOrganizerApplicationsFromUsers(users),
             };
           });
           return;
@@ -610,7 +612,10 @@ const useAuthStore = create(
 
         try {
           const users = await fetchProfilesList();
-          set({ users });
+          set({
+            users,
+            organizerApplications: buildOrganizerApplicationsFromUsers(users),
+          });
         } catch (error) {
           set({ error: error?.message || 'Unable to refresh profiles.' });
         }
