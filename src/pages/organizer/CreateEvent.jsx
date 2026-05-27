@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import useAuthStore from '../../store/authStore';
 import useEventStore from '../../store/eventStore';
@@ -20,6 +22,8 @@ import {
   getParticipantLimitMessage,
   getTeamLimitPreset,
 } from '../../utils/teamEventRules';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 const STEPS = [
   { id: 1, title: 'Event Setup', icon: 'bi bi-card-checklist' },
@@ -183,6 +187,24 @@ function getCriteriaSourceTone(source) {
   if (source === 'api') return '#2563eb';
   if (source === 'uploaded') return '#059669';
   return '#b45309';
+}
+
+async function extractPdfText(file) {
+  const data = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data }).promise;
+  const pageTexts = [];
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    const text = content.items
+      .map((item) => ('str' in item ? item.str : ''))
+      .filter(Boolean)
+      .join(' ');
+    pageTexts.push(text);
+  }
+
+  return pageTexts.join('\n').trim();
 }
 
 function StepIndicator({ currentStep, activeSteps, competitionMode }) {
@@ -616,9 +638,10 @@ export default function CreateEvent() {
     if (!file) return;
 
     try {
-      const text = await file.text();
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      const text = isPdf ? await extractPdfText(file) : await file.text();
       if (!text.trim()) {
-        throw new Error('The uploaded criteria file is empty.');
+        throw new Error(isPdf ? 'No readable text found in this PDF.' : 'The uploaded criteria file is empty.');
       }
       setUploadedCriteriaText(text);
       setUploadedCriteriaName(file.name);
@@ -1378,11 +1401,11 @@ export default function CreateEvent() {
                       <div style={eyebrowStyle}>Ready-made criteria</div>
                       <div style={{ color: '#0f172a', fontWeight: 800, marginBottom: 8 }}>Upload or paste template</div>
                       <div style={{ color: '#475569', fontSize: 13, lineHeight: 1.5, marginBottom: 12 }}>
-                        Accepted format: JSON criteria list, or one criterion per line as Name | Weight | Description.
+                        Accepted format: PDF, JSON criteria list, or one criterion per line as Name | Weight | Description.
                       </div>
                       <input
                         type="file"
-                        accept=".json,.txt,.csv,.md"
+                        accept=".pdf,application/pdf,.json,.txt,.csv,.md"
                         onChange={handleCriteriaFileUpload}
                         style={{ ...inputStyle, padding: 12, height: 'auto', marginBottom: 10 }}
                       />
