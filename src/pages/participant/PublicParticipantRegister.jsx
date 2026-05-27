@@ -755,22 +755,26 @@ function Opt() {
 }
 
 const fullPage = {
-  minHeight: '100vh',
+  minHeight: '100svh',
   background: 'linear-gradient(135deg, #eff6ff, #f0f9ff)',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  justifyContent: 'center',
-  padding: 24,
+  justifyContent: 'flex-start',
+  padding: 'clamp(20px, 4vw, 48px) clamp(12px, 3vw, 28px)',
+  overflowX: 'hidden',
+  overflowY: 'auto',
+  boxSizing: 'border-box',
 };
 
 const card = {
   background: '#ffffff',
   border: '1px solid #dbeafe',
-  borderRadius: 24,
-  padding: 32,
-  width: '100%',
+  borderRadius: 20,
+  padding: 'clamp(18px, 3vw, 32px)',
+  width: 'min(100%, 760px)',
   maxWidth: 760,
+  margin: '0 auto',
   boxShadow: '0 20px 60px rgba(37,99,235,0.12)',
   boxSizing: 'border-box',
 };
