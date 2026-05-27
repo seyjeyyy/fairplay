@@ -242,6 +242,7 @@ export default function CreateEvent() {
     title: '',
     eventType: 'tournament',
     description: '',
+    imageUrl: '',
     location: '',
     format: 'in-person',
     scoringType: 'weighted',
@@ -735,6 +736,9 @@ export default function CreateEvent() {
         eventType: form.eventType,
         type: form.eventType,
         description: form.description,
+        image: form.imageUrl,
+        imageUrl: form.imageUrl,
+        coverImage: form.imageUrl,
         location: form.location,
         format: form.format,
         scoringType: form.scoringType,
@@ -890,6 +894,33 @@ export default function CreateEvent() {
                         <span>{isGeneratingDescription ? 'Drafting...' : form.description.trim() ? 'Regenerate' : 'Generate Description'}</span>
                       </button>
                     </div>
+                  </Field>
+
+                  <Field label="Event Image URL">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 180px', gap: 14, alignItems: 'stretch' }}>
+                      <input
+                        name="imageUrl"
+                        value={form.imageUrl}
+                        onChange={handleFieldChange}
+                        placeholder="Paste event poster, banner, or cover image link"
+                        style={inputStyle}
+                      />
+                      <div style={{ borderRadius: 14, border: '1px solid #dbeafe', background: '#f8fbff', overflow: 'hidden', minHeight: 72 }}>
+                        {form.imageUrl ? (
+                          <img
+                            src={form.imageUrl}
+                            alt="Event preview"
+                            style={{ width: '100%', height: '100%', minHeight: 72, objectFit: 'cover', display: 'block' }}
+                            onError={(event) => { event.currentTarget.style.display = 'none'; }}
+                          />
+                        ) : (
+                          <div style={{ height: '100%', minHeight: 72, display: 'grid', placeItems: 'center', color: '#94a3b8', fontSize: 12, fontWeight: 700 }}>
+                            No image yet
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div style={helperTextStyle}>This image is shown on admin oversight and event cards so admins can visually track the organizer flow.</div>
                   </Field>
 
                   <div style={gridTwoStyle}>
