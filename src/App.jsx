@@ -1,0 +1,249 @@
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Suspense, lazy, useEffect } from 'react';
+import useAuthStore from './store/authStore';
+import ToastContainer from './components/ui/Toast';
+import GlobalAuthModal from './components/auth/GlobalAuthModal';
+import AIChatbot from './components/AIChatbot';
+import { APPROVAL_ROLES, buildAuthModalPath, buildReturnToPath, roleHomePath } from './utils/navigation';
+
+const Landing = lazy(() => import('./pages/public/Landing'));
+const PremiumLanding = lazy(() => import('./pages/public/PremiumLanding'));
+const PublicEventView = lazy(() => import('./pages/public/PublicEventView'));
+const PublicBrackets = lazy(() => import('./pages/public/PublicBrackets'));
+const PublicLeaderboard = lazy(() => import('./pages/public/PublicLeaderboard'));
+const QRInterceptor = lazy(() => import('./pages/public/QRInterceptor'));
+const QRResolver = lazy(() => import('./components/qr/QRResolver'));
+
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics'));
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
+const AdminRoles = lazy(() => import('./pages/admin/AdminRoles'));
+const AdminAudit = lazy(() => import('./pages/admin/AdminAudit'));
+const AdminAIMonitor = lazy(() => import('./pages/admin/AdminAIMonitor'));
+const AdminReports = lazy(() => import('./pages/admin/AdminReports'));
+const AdminSubscriptions = lazy(() => import('./pages/admin/AdminSubscriptions'));
+const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
+const AdminBackup = lazy(() => import('./pages/admin/AdminBackup'));
+
+const OrganizerDashboard = lazy(() => import('./pages/organizer/OrganizerDashboard'));
+const CreateEvent = lazy(() => import('./pages/organizer/CreateEvent'));
+const OrganizerEvents = lazy(() => import('./pages/organizer/OrganizerEvents'));
+const OrganizerContestants = lazy(() => import('./pages/organizer/OrganizerContestants'));
+const OrganizerJudges = lazy(() => import('./pages/organizer/OrganizerJudges'));
+const OrganizerSchedule = lazy(() => import('./pages/organizer/OrganizerSchedule'));
+const OrganizerVenues = lazy(() => import('./pages/organizer/OrganizerVenues'));
+const OrganizerReports = lazy(() => import('./pages/organizer/OrganizerReports'));
+const OrganizerSettings = lazy(() => import('./pages/organizer/OrganizerSettings'));
+const OrganizerBracket = lazy(() => import('./pages/organizer/OrganizerBracket'));
+const OrganizerVerification = lazy(() => import('./pages/organizer/OrganizerVerification'));
+const OrganizerEventDetail = lazy(() => import('./pages/organizer/OrganizerEventDetail'));
+const OrganizerCertificates = lazy(() => import('./pages/organizer/OrganizerCertificates'));
+
+const JudgeDashboard = lazy(() => import('./pages/judge/JudgeDashboard'));
+const JudgeEvents = lazy(() => import('./pages/judge/JudgeEvents'));
+const JudgeScoring = lazy(() => import('./pages/judge/JudgeScoring'));
+const JudgeReview = lazy(() => import('./pages/judge/JudgeReview'));
+const JudgeHistory = lazy(() => import('./pages/judge/JudgeHistory'));
+const JudgeSettings = lazy(() => import('./pages/judge/JudgeSettings'));
+const JudgeSessionGate = lazy(() => import('./pages/judge/JudgeSessionGate'));
+const JudgePublicScoring = lazy(() => import('./pages/judge/JudgePublicScoring'));
+const JudgeLiveScoring = lazy(() => import('./pages/judge/JudgeLiveScoring'));
+const ScorerLiveScoring = lazy(() => import('./pages/scorer/ScorerLiveScoring'));
+const ScorerSession = lazy(() => import('./pages/scorer/ScorerSession'));
+
+const PublicParticipantRegister = lazy(() => import('./pages/participant/PublicParticipantRegister'));
+const ParticipantDashboard = lazy(() => import('./pages/participant/ParticipantDashboard'));
+const ParticipantEvents = lazy(() => import('./pages/participant/ParticipantEvents'));
+const ParticipantSchedule = lazy(() => import('./pages/participant/ParticipantSchedule'));
+const ParticipantScores = lazy(() => import('./pages/participant/ParticipantScores'));
+const ParticipantAnnouncements = lazy(() => import('./pages/participant/ParticipantAnnouncements'));
+const ParticipantProfile = lazy(() => import('./pages/participant/ParticipantProfile'));
+const TeamRegistration = lazy(() => import('./pages/participant/TeamRegistration'));
+const IndividualRegistration = lazy(() => import('./pages/participant/IndividualRegistration'));
+const RegistrationSuccess = lazy(() => import('./pages/participant/RegistrationSuccess'));
+
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
+const BracketsPage = lazy(() => import('./pages/BracketsPage'));
+const LeaderboardPage = lazy(() => import('./pages/LeaderboardPage'));
+
+function ProtectedRoute({ children, role, roles }) {
+  const { user, token, loading, initialized } = useAuthStore();
+  const location = useLocation();
+
+  if (loading || !initialized) {
+    return <LoadingFallback />;
+  }
+
+  if (!user || !token) {
+    return <Navigate to={buildAuthModalPath('login', buildReturnToPath(location))} replace />;
+  }
+
+  const allowedRoles = roles || (role ? [role] : []);
+  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+    return <Navigate to={roleHomePath(user.role)} replace />;
+  }
+
+  return children;
+}
+
+function DashboardRedirect() {
+  const { user, token, loading, initialized } = useAuthStore();
+  const location = useLocation();
+
+  if (loading || !initialized) {
+    return <LoadingFallback />;
+  }
+
+  if (!user || !token) {
+    return <Navigate to={buildAuthModalPath('login', buildReturnToPath(location))} replace />;
+  }
+
+  return <Navigate to={roleHomePath(user.role)} replace />;
+}
+
+function AuthEntryRedirect({ mode }) {
+  const location = useLocation();
+  const currentParams = new URLSearchParams(location.search);
+  const returnTo = currentParams.get('returnTo') || '';
+
+  return <Navigate to={buildAuthModalPath(mode, returnTo)} replace />;
+}
+
+function LoadingFallback() {
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#000',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'column',
+        gap: 16,
+      }}
+    >
+      <div
+        style={{
+          width: 56,
+          height: 56,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          animation: 'pulse 1.5s ease-in-out infinite',
+        }}
+      >
+        <img src="/icon.svg" alt="Loading FairPlay..." style={{ width: '100%', height: '100%', filter: 'drop-shadow(0 0 15px rgba(6, 182, 212, 0.5))' }} />
+      </div>
+      <p style={{ color: '#a0aec0', fontSize: 14 }}>Loading FairPlay...</p>
+      <style>{`
+        @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(0.95); } }
+      `}</style>
+    </div>
+  );
+}
+
+export default function App() {
+  const initAuth = useAuthStore((state) => state.initAuth);
+
+  useEffect(() => {
+    // Initialize AI logging system
+    if (typeof window !== 'undefined' && !window.fairplayAILog) {
+      window.fairplayAILog = [];
+    }
+  }, []);
+
+  useEffect(() => {
+    initAuth();
+  }, [initAuth]);
+
+  return (
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <GlobalAuthModal />
+      <Suspense fallback={<LoadingFallback />}>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/premium" element={<PremiumLanding />} />
+          <Route path="/login" element={<AuthEntryRedirect mode="login" />} />
+          <Route path="/register" element={<AuthEntryRedirect mode="register" />} />
+          <Route path="/events/:id" element={<PublicEventView />} />
+          <Route path="/events/:id/brackets" element={<PublicBrackets />} />
+          <Route path="/events/:id/leaderboard" element={<PublicLeaderboard />} />
+          <Route path="/qr/:token" element={<QRInterceptor />} />
+          <Route path="/scan/:token" element={<QRResolver />} />
+
+          {/* Admin Routes */}
+          <Route path="/admin" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/admin/analytics" element={<ProtectedRoute role="admin"><AdminAnalytics /></ProtectedRoute>} />
+          <Route path="/admin/users" element={<ProtectedRoute role="admin"><AdminUsers /></ProtectedRoute>} />
+          <Route path="/admin/roles" element={<ProtectedRoute roles={APPROVAL_ROLES}><AdminRoles /></ProtectedRoute>} />
+          <Route path="/admin/audit" element={<ProtectedRoute role="admin"><AdminAudit /></ProtectedRoute>} />
+          <Route path="/admin/ai-monitor" element={<ProtectedRoute role="admin"><AdminAIMonitor /></ProtectedRoute>} />
+          <Route path="/admin/reports" element={<ProtectedRoute role="admin"><AdminReports /></ProtectedRoute>} />
+          <Route path="/admin/subscriptions" element={<ProtectedRoute role="admin"><AdminSubscriptions /></ProtectedRoute>} />
+          <Route path="/admin/settings" element={<ProtectedRoute role="admin"><AdminSettings /></ProtectedRoute>} />
+          <Route path="/admin/backup" element={<ProtectedRoute role="admin"><AdminBackup /></ProtectedRoute>} />
+          <Route path="/admin/profile" element={<ProtectedRoute role="admin"><AdminSettings /></ProtectedRoute>} />
+
+          {/* Approval Routes */}
+          <Route path="/approvals" element={<ProtectedRoute roles={APPROVAL_ROLES}><AdminRoles /></ProtectedRoute>} />
+          <Route path="/institute-coordinator" element={<ProtectedRoute role="institute-coordinator"><AdminRoles /></ProtectedRoute>} />
+          <Route path="/sports-head" element={<ProtectedRoute role="sports-head"><AdminRoles /></ProtectedRoute>} />
+          <Route path="/osds" element={<ProtectedRoute role="osds"><AdminRoles /></ProtectedRoute>} />
+
+          {/* Organizer Routes */}
+          <Route path="/organizer" element={<ProtectedRoute role="organizer"><OrganizerDashboard /></ProtectedRoute>} />
+          <Route path="/organizer/create-event" element={<ProtectedRoute role="organizer"><CreateEvent /></ProtectedRoute>} />
+          <Route path="/organizer/events" element={<ProtectedRoute role="organizer"><OrganizerEvents /></ProtectedRoute>} />
+          <Route path="/organizer/contestants" element={<ProtectedRoute role="organizer"><OrganizerContestants /></ProtectedRoute>} />
+          <Route path="/organizer/judges" element={<ProtectedRoute role="organizer"><OrganizerJudges /></ProtectedRoute>} />
+          <Route path="/organizer/schedule" element={<ProtectedRoute role="organizer"><OrganizerSchedule /></ProtectedRoute>} />
+          <Route path="/organizer/venues" element={<ProtectedRoute role="organizer"><OrganizerVenues /></ProtectedRoute>} />
+          <Route path="/organizer/reports" element={<ProtectedRoute role="organizer"><OrganizerReports /></ProtectedRoute>} />
+          <Route path="/organizer/settings" element={<ProtectedRoute role="organizer"><OrganizerSettings /></ProtectedRoute>} />
+          <Route path="/organizer/brackets" element={<ProtectedRoute role="organizer"><OrganizerBracket /></ProtectedRoute>} />
+          <Route path="/organizer/events/:id" element={<ProtectedRoute role="organizer"><OrganizerEventDetail /></ProtectedRoute>} />
+          <Route path="/organizer/verify/:token" element={<ProtectedRoute role="organizer"><OrganizerVerification /></ProtectedRoute>} />
+          <Route path="/organizer/certificates" element={<ProtectedRoute role="organizer"><OrganizerCertificates /></ProtectedRoute>} />
+          <Route path="/organizer/profile" element={<ProtectedRoute role="organizer"><OrganizerSettings /></ProtectedRoute>} />
+
+          {/* Judge Routes */}
+          <Route path="/judge" element={<ProtectedRoute role="judge"><JudgeDashboard /></ProtectedRoute>} />
+          <Route path="/judge/events" element={<ProtectedRoute role="judge"><JudgeEvents /></ProtectedRoute>} />
+          <Route path="/judge/scoring" element={<ProtectedRoute role="judge"><JudgeScoring /></ProtectedRoute>} />
+          <Route path="/judge/review" element={<ProtectedRoute role="judge"><JudgeReview /></ProtectedRoute>} />
+          <Route path="/judge/history" element={<ProtectedRoute role="judge"><JudgeHistory /></ProtectedRoute>} />
+          <Route path="/judge/settings" element={<ProtectedRoute role="judge"><JudgeSettings /></ProtectedRoute>} />
+          <Route path="/judge/profile" element={<ProtectedRoute role="judge"><JudgeSettings /></ProtectedRoute>} />
+          <Route path="/participant/register" element={<PublicParticipantRegister />} />
+          <Route path="/judge/open/:eventId" element={<JudgePublicScoring />} />
+          <Route path="/judge/session/:sessionId" element={<JudgeSessionGate />} />
+          <Route path="/judge/live/:sessionId" element={<JudgeLiveScoring />} />
+          <Route path="/scorer/live/:sessionId" element={<ScorerLiveScoring />} />
+          <Route path="/scorer/session/:token" element={<ScorerSession />} />
+          <Route path="/judge/score/:token" element={<ProtectedRoute role="judge"><JudgeScoring /></ProtectedRoute>} />
+
+          {/* Participant Routes */}
+          <Route path="/participant" element={<ProtectedRoute role="participant"><ParticipantDashboard /></ProtectedRoute>} />
+          <Route path="/participant/events" element={<ProtectedRoute role="participant"><ParticipantEvents /></ProtectedRoute>} />
+          <Route path="/participant/schedule" element={<ProtectedRoute role="participant"><ParticipantSchedule /></ProtectedRoute>} />
+          <Route path="/participant/scores" element={<ProtectedRoute role="participant"><ParticipantScores /></ProtectedRoute>} />
+          <Route path="/participant/announcements" element={<ProtectedRoute role="participant"><ParticipantAnnouncements /></ProtectedRoute>} />
+          <Route path="/participant/profile" element={<ProtectedRoute role="participant"><ParticipantProfile /></ProtectedRoute>} />
+          <Route path="/participant/register-team" element={<ProtectedRoute role="participant"><TeamRegistration /></ProtectedRoute>} />
+          <Route path="/participant/register-individual" element={<ProtectedRoute role="participant"><IndividualRegistration /></ProtectedRoute>} />
+          <Route path="/participant/registration-success" element={<ProtectedRoute role="participant"><RegistrationSuccess /></ProtectedRoute>} />
+
+          {/* Legacy / Common Routes */}
+          <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
+          <Route path="/brackets" element={<ProtectedRoute><BracketsPage /></ProtectedRoute>} />
+          <Route path="/leaderboard" element={<ProtectedRoute><LeaderboardPage /></ProtectedRoute>} />
+
+          <Route path="/dashboard" element={<DashboardRedirect />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+      <AIChatbot />
+      <ToastContainer />
+    </Router>
+  );
+}

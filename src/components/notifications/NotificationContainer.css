@@ -1,0 +1,44 @@
+/* Notification Container */
+.notification-container {
+  position: fixed;
+  top: 90px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  z-index: var(--z-tooltip);
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  pointer-events: none;
+}
+
+.notification-container > * {
+  pointer-events: auto;
+}
+
+/* Scrollbar for container */
+.notification-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.notification-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notification-container::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+.notification-container::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .notification-container {
+    top: 70px;
+    right: 10px;
+    left: 10px;
+  }
+}

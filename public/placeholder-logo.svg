@@ -1,0 +1,27 @@
+<svg width="320" height="80" viewBox="0 0 320 80" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">FairPlay</title>
+  <desc id="desc">FairPlay event management system logo.</desc>
+  <defs>
+    <linearGradient id="markBg" x1="8" y1="8" x2="72" y2="72" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0EA5E9"/>
+      <stop offset="0.55" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="markAccent" x1="27" y1="38" x2="51" y2="51" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#67E8F9"/>
+      <stop offset="1" stop-color="#22C55E"/>
+    </linearGradient>
+    <linearGradient id="word" x1="90" y1="18" x2="255" y2="62" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"/>
+      <stop offset="0.62" stop-color="#1D4ED8"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="72" height="72" rx="18" fill="#020617"/>
+  <rect x="8" y="8" width="64" height="64" rx="16" fill="url(#markBg)"/>
+  <path d="M21 20.5C27.8 19.3 34.2 16.8 40 13.2C45.8 16.8 52.2 19.3 59 20.5V36.6C59 49.2 51.6 59.1 40 63.2C28.4 59.1 21 49.2 21 36.6V20.5Z" fill="#F8FAFC"/>
+  <path d="M27 25.1C31.5 24.1 35.9 22.5 40 19.9C44.1 22.5 48.5 24.1 53 25.1V36.7C53 46.1 48.5 53 40 56.8C31.5 53 27 46.1 27 36.7V25.1Z" fill="#0F172A"/>
+  <path d="M33 38.5L38 43.5L48.5 32.7" stroke="url(#markAccent)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="92" y="48" fill="url(#word)" font-family="Inter, Manrope, Segoe UI, Arial, sans-serif" font-size="34" font-weight="900" letter-spacing="0">FairPlay</text>
+  <text x="94" y="65" fill="#475569" font-family="Inter, Manrope, Segoe UI, Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="2.2">EVENT SYSTEM</text>
+</svg>

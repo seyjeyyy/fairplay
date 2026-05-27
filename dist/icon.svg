@@ -1,0 +1,25 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">FairPlay icon</title>
+  <desc id="desc">A shield, check mark, and scoring bracket for the FairPlay event management system.</desc>
+  <defs>
+    <linearGradient id="bg" x1="24" y1="18" x2="156" y2="162" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0EA5E9"/>
+      <stop offset="0.52" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="48" y1="48" x2="132" y2="132" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#67E8F9"/>
+      <stop offset="1" stop-color="#22C55E"/>
+    </linearGradient>
+    <filter id="shadow" x="16" y="14" width="148" height="154" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#020617" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <rect width="180" height="180" rx="40" fill="#020617"/>
+  <rect x="10" y="10" width="160" height="160" rx="34" fill="url(#bg)"/>
+  <path d="M37 42C56.5 39.2 73.8 33.2 90 23C106.2 33.2 123.5 39.2 143 42V84.5C143 118.6 121.8 145.6 90 157C58.2 145.6 37 118.6 37 84.5V42Z" fill="#F8FAFC" fill-opacity="0.96" filter="url(#shadow)"/>
+  <path d="M50 52.7C64.6 49.8 78.2 44.7 90 37.4C101.8 44.7 115.4 49.8 130 52.7V84.8C130 111.6 114.8 132.5 90 143C65.2 132.5 50 111.6 50 84.8V52.7Z" fill="#0F172A"/>
+  <path d="M72 90.4L84.8 103.2L111.5 75.6" stroke="url(#accent)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M63 65H83M63 77H75M117 104H97M117 116H105" stroke="#93C5FD" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="90" cy="90" r="59" stroke="#E0F2FE" stroke-opacity="0.22" stroke-width="4"/>
+</svg>
