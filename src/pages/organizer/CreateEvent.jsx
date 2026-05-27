@@ -399,6 +399,38 @@ export default function CreateEvent() {
     });
   }, []);
 
+  const handleEventImageUpload = useCallback((event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/png', 'image/jpeg'];
+    if (!allowedTypes.includes(file.type)) {
+      error('Please upload a PNG or JPEG image only.');
+      event.target.value = '';
+      return;
+    }
+
+    const maxSizeInBytes = 2 * 1024 * 1024;
+    if (file.size > maxSizeInBytes) {
+      error('Image is too large. Please upload a PNG or JPEG under 2 MB.');
+      event.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setForm((current) => ({
+        ...current,
+        imageUrl: String(reader.result || ''),
+      }));
+      success('Event image uploaded.');
+    };
+    reader.onerror = () => {
+      error('Unable to read the image file.');
+    };
+    reader.readAsDataURL(file);
+  }, [error, success]);
+
   const updateRound = useCallback((id, field, value) => {
     setForm((cur) => ({
       ...cur,
@@ -1012,15 +1044,38 @@ export default function CreateEvent() {
                     </div>
                   </Field>
 
-                  <Field label="Event Image URL">
+                  <Field label="Event Image">
                     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 180px', gap: 14, alignItems: 'stretch' }}>
-                      <input
-                        name="imageUrl"
-                        value={form.imageUrl}
-                        onChange={handleFieldChange}
-                        placeholder="Paste event poster, banner, or cover image link"
-                        style={inputStyle}
-                      />
+                      <div style={{ display: 'grid', gap: 10 }}>
+                        <input
+                          name="imageUrl"
+                          value={form.imageUrl}
+                          onChange={handleFieldChange}
+                          placeholder="Paste event poster, banner, or cover image link"
+                          style={inputStyle}
+                        />
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <label style={uploadImageButtonStyle}>
+                            <i className="bi bi-image" />
+                            Upload PNG/JPEG
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,.png,.jpg,.jpeg"
+                              onChange={handleEventImageUpload}
+                              style={{ display: 'none' }}
+                            />
+                          </label>
+                          {form.imageUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setForm((current) => ({ ...current, imageUrl: '' }))}
+                              style={clearImageButtonStyle}
+                            >
+                              Remove image
+                            </button>
+                          )}
+                        </div>
+                      </div>
                       <div style={{ borderRadius: 14, border: '1px solid #dbeafe', background: '#f8fbff', overflow: 'hidden', minHeight: 72 }}>
                         {form.imageUrl ? (
                           <img
@@ -1036,7 +1091,7 @@ export default function CreateEvent() {
                         )}
                       </div>
                     </div>
-                    <div style={helperTextStyle}>This image is shown on admin oversight and event cards so admins can visually track the organizer flow.</div>
+                    <div style={helperTextStyle}>Paste an image link or upload a PNG/JPEG poster. This image is shown on admin oversight and event cards.</div>
                   </Field>
 
                   <div style={gridTwoStyle}>
@@ -1936,6 +1991,32 @@ const secondaryButtonStyle = {
   padding: '12px 18px',
   cursor: 'pointer',
   minHeight: 46,
+};
+
+const uploadImageButtonStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  borderRadius: 12,
+  border: '1px solid #bfdbfe',
+  background: '#eff6ff',
+  color: '#1d4ed8',
+  fontWeight: 800,
+  fontSize: 13,
+  padding: '10px 14px',
+  cursor: 'pointer',
+};
+
+const clearImageButtonStyle = {
+  border: '1px solid #fecaca',
+  background: '#fff1f2',
+  color: '#dc2626',
+  borderRadius: 12,
+  fontWeight: 800,
+  fontSize: 13,
+  padding: '10px 14px',
+  cursor: 'pointer',
 };
 
 const helperTextStyle = {
