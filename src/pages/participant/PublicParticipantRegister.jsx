@@ -10,8 +10,9 @@ import {
 } from '../../utils/teamEventRules';
 
 const STORAGE_KEY = 'fairplay_participant_identity';
-const emptyPerson = { fullName: '', age: '', schoolId: '', phone: '', email: '' };
-const emptyMember = { fullName: '', age: '', schoolId: '', phone: '', email: '', roleOrPosition: '' };
+const SCHOOL_YEAR_OPTIONS = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
+const emptyPerson = { fullName: '', age: '', schoolYear: '', phone: '', email: '' };
+const emptyMember = { fullName: '', age: '', schoolYear: '', phone: '', email: '', roleOrPosition: '' };
 
 function getStoredParticipant() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); }
@@ -158,8 +159,8 @@ export default function PublicParticipantRegister() {
           setSubmitting(false);
           return;
         }
-        if (hasLeader && (!teamLeader.age || !teamLeader.schoolId.trim())) {
-          setErrorMsg('Team Leader age and school ID are required.');
+        if (hasLeader && (!teamLeader.age || !teamLeader.schoolYear)) {
+          setErrorMsg('Team Leader age and school year are required.');
           setSubmitting(false);
           return;
         }
@@ -181,9 +182,9 @@ export default function PublicParticipantRegister() {
           setSubmitting(false);
           return;
         }
-        const incompleteMember = teamMembers.find((member) => !member.fullName.trim() || !member.age || !member.schoolId.trim());
+        const incompleteMember = teamMembers.find((member) => !member.fullName.trim() || !member.age || !member.schoolYear);
         if (incompleteMember) {
-          setErrorMsg('Every team member must have a full name, age, and school ID.');
+          setErrorMsg('Every team member must have a full name, age, and school year.');
           setSubmitting(false);
           return;
         }
@@ -197,6 +198,7 @@ export default function PublicParticipantRegister() {
           ? teamMembers.map((member) => ({
               ...member,
               name: member.fullName,
+              school_year: member.schoolYear,
               role_or_position: member.roleOrPosition,
               is_team_leader: teamLeader.fullName.trim().toLowerCase() === member.fullName.trim().toLowerCase(),
             }))
@@ -280,13 +282,12 @@ export default function PublicParticipantRegister() {
     const draft = {
       ...memberDraft,
       fullName: memberDraft.fullName.trim(),
-      schoolId: memberDraft.schoolId.trim(),
       email: memberDraft.email.trim(),
       phone: memberDraft.phone.trim(),
       roleOrPosition: memberDraft.roleOrPosition.trim(),
     };
-    if (!draft.fullName || !draft.age || !draft.schoolId) {
-      setErrorMsg('Team member full name, age, and school ID are required.');
+    if (!draft.fullName || !draft.age || !draft.schoolYear) {
+      setErrorMsg('Team member full name, age, and school year are required.');
       return;
     }
     const contactError = validateContactDraft(draft, 'Team member');
@@ -313,7 +314,7 @@ export default function PublicParticipantRegister() {
     setMemberDraft({
       fullName: member.fullName || member.name || '',
       age: member.age || '',
-      schoolId: member.schoolId || member.school_id || '',
+      schoolYear: member.schoolYear || member.school_year || member.schoolId || member.school_id || '',
       phone: member.phone || member.phone_number || '',
       email: member.email || '',
       roleOrPosition: member.roleOrPosition || member.role_or_position || '',
@@ -591,8 +592,11 @@ export default function PublicParticipantRegister() {
                     <input type="number" min="1" value={teamLeader.age} onChange={(e) => updatePerson(setTeamLeader, 'age', e.target.value)} style={{ ...inputStyle, background: '#fff' }} disabled={submitting} />
                   </div>
                   <div>
-                    <label style={labelStyle}>School ID <Req /></label>
-                    <input value={teamLeader.schoolId} onChange={(e) => updatePerson(setTeamLeader, 'schoolId', e.target.value)} style={{ ...inputStyle, background: '#fff' }} disabled={submitting} />
+                    <label style={labelStyle}>School Year <Req /></label>
+                    <select value={teamLeader.schoolYear} onChange={(e) => updatePerson(setTeamLeader, 'schoolYear', e.target.value)} style={{ ...inputStyle, background: '#fff' }} disabled={submitting}>
+                      <option value="">Select school year</option>
+                      {SCHOOL_YEAR_OPTIONS.map((year) => <option key={year} value={year}>{year}</option>)}
+                    </select>
                   </div>
                 </div>
                 <div>
@@ -617,8 +621,11 @@ export default function PublicParticipantRegister() {
                     <input type="number" min="1" value={coach.age} onChange={(e) => updatePerson(setCoach, 'age', e.target.value)} style={{ ...inputStyle, background: '#fff' }} disabled={submitting} />
                   </div>
                   <div>
-                    <label style={labelStyle}>School / Staff ID <Opt /></label>
-                    <input value={coach.schoolId} onChange={(e) => updatePerson(setCoach, 'schoolId', e.target.value)} style={{ ...inputStyle, background: '#fff' }} disabled={submitting} />
+                    <label style={labelStyle}>School Year <Opt /></label>
+                    <select value={coach.schoolYear} onChange={(e) => updatePerson(setCoach, 'schoolYear', e.target.value)} style={{ ...inputStyle, background: '#fff' }} disabled={submitting}>
+                      <option value="">Select school year</option>
+                      {SCHOOL_YEAR_OPTIONS.map((year) => <option key={year} value={year}>{year}</option>)}
+                    </select>
                   </div>
                 </div>
                 <div>
@@ -643,8 +650,11 @@ export default function PublicParticipantRegister() {
                     <input type="number" min="1" value={memberDraft.age} onChange={(e) => setMemberDraft((current) => ({ ...current, age: e.target.value }))} style={inputStyle} disabled={submitting} />
                   </div>
                   <div>
-                    <label style={labelStyle}>School ID <Req /></label>
-                    <input value={memberDraft.schoolId} onChange={(e) => setMemberDraft((current) => ({ ...current, schoolId: e.target.value }))} style={inputStyle} disabled={submitting} />
+                    <label style={labelStyle}>School Year <Req /></label>
+                    <select value={memberDraft.schoolYear} onChange={(e) => setMemberDraft((current) => ({ ...current, schoolYear: e.target.value }))} style={inputStyle} disabled={submitting}>
+                      <option value="">Select school year</option>
+                      {SCHOOL_YEAR_OPTIONS.map((year) => <option key={year} value={year}>{year}</option>)}
+                    </select>
                   </div>
                 </div>
                 <div style={responsiveTwoColumnGrid}>
@@ -684,7 +694,7 @@ export default function PublicParticipantRegister() {
                       <div>
                         <strong>{index + 1}. {member.fullName}</strong>
                         <div style={{ color: '#64748b', fontSize: 12 }}>
-                          Age {member.age} - ID {member.schoolId}{member.roleOrPosition ? ` - ${member.roleOrPosition}` : ''}
+                          Age {member.age} - {member.schoolYear || 'School year not set'}{member.roleOrPosition ? ` - ${member.roleOrPosition}` : ''}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6 }}>

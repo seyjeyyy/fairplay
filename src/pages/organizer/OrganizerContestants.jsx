@@ -269,7 +269,9 @@ export default function OrganizerContestants() {
                 <div key={member.id || `${member.fullName}-${index}`} style={{ padding: 12, borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#0f172a' }}>
                   <strong>{index + 1}. {member.fullName || member.name || member}</strong>
                   {typeof member === 'object' && (
-                    <div style={{ color: '#64748b', fontSize: 12 }}>Age {member.age || '-'} - ID {member.schoolId || member.school_id || '-'}{member.roleOrPosition ? ` - ${member.roleOrPosition}` : ''}</div>
+                    <div style={{ color: '#64748b', fontSize: 12 }}>
+                      Age {member.age || '-'} - {member.schoolYear || member.school_year || 'School year not set'}{member.roleOrPosition ? ` - ${member.roleOrPosition}` : ''}
+                    </div>
                   )}
                 </div>
               ))}

@@ -263,6 +263,7 @@ alter table public.events add column if not exists metadata jsonb default '{}'::
 
 alter table public.teams add column if not exists players jsonb default '[]'::jsonb;
 alter table public.teams add column if not exists stats jsonb default '{}'::jsonb;
+alter table public.team_members add column if not exists school_year text;
 
 alter table public.registrations add column if not exists registration_type text default 'individual';
 alter table public.registrations add column if not exists team_name text;

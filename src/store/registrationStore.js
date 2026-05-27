@@ -7,11 +7,15 @@ import useTeamStore from './teamStore';
 import { inferTeamLimitConfig, validateTeamMemberCount } from '../utils/teamEventRules';
 
 const initialDetails = { name: '', email: '', phone: '', qrToken: '' };
-const initialRepresentative = { fullName: '', age: '', schoolId: '', phone: '', email: '' };
+const initialRepresentative = { fullName: '', age: '', schoolYear: '', phone: '', email: '' };
 const initialLastSubmitted = null;
 
-function createRegistrationId(prefix = 'registration') {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+function createNumericId() {
+  return Date.now() + Math.floor(Math.random() * 1000);
+}
+
+function createRegistrationId() {
+  return createNumericId();
 }
 
 function createQrToken(prefix = 'qr') {
@@ -207,7 +211,7 @@ const useRegistrationStore = create(
           const team = await useTeamStore.getState().createTeam({
             name: teamName,
             eventId,
-            members: roster.map((player) => player.name),
+            members: roster,
             players: roster,
           });
           if (!team) {
@@ -401,7 +405,7 @@ const useRegistrationStore = create(
             const team = await useTeamStore.getState().createTeam({
               name: teamName,
               eventId,
-              members: roster.map((player) => player.fullName || player.name),
+              members: roster,
               players: roster,
               status: 'Pending',
               schoolOrganization,

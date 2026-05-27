@@ -2,6 +2,10 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { isSupabaseConfigured, supabase } from '../utils/supabaseClient';
 
+function createNumericId() {
+  return Date.now() + Math.floor(Math.random() * 1000);
+}
+
 function normalizeTeam(team) {
   const stats = team.stats && typeof team.stats === 'object' ? team.stats : {};
   const metadata = (
@@ -14,7 +18,7 @@ function normalizeTeam(team) {
 
   return {
     ...team,
-    id: team.id || `team-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: team.id || createNumericId(),
     name: team.name || 'Untitled Team',
     eventId: team.eventId || team.event_id || null,
     members: Array.isArray(team.members) ? team.members : Array.isArray(team.players) ? team.players : [],
@@ -86,18 +90,6 @@ const useTeamStore = create(
 
       createTeam: async (data) => {
         const team = normalizeTeam(data);
-        const teamMetadata = {
-          schoolOrganization: team.schoolOrganization,
-          division: team.division,
-          representativeType: team.representativeType,
-          teamLeader: team.teamLeader,
-          coach: team.coach,
-          sportType: team.sportType,
-          esportGame: team.esportGame,
-          customSportName: team.customSportName,
-          minParticipants: team.minParticipants,
-          maxParticipants: team.maxParticipants,
-        };
         set((state) => ({ teams: [team, ...state.teams] }));
 
         if (!isSupabaseConfigured) {
@@ -111,9 +103,7 @@ const useTeamStore = create(
               id: team.id,
               name: team.name,
               event_id: team.eventId,
-              members: team.members,
-              players: team.players,
-              stats: { ...team.stats, metadata: teamMetadata },
+              members: team.players?.length ? team.players : team.members,
               status: team.status,
               coach_name: team.coach?.fullName || '',
               school_name: team.schoolOrganization,
@@ -153,25 +143,11 @@ const useTeamStore = create(
         }
 
         try {
-          const teamMetadata = {
-            schoolOrganization: updatedTeam.schoolOrganization,
-            division: updatedTeam.division,
-            representativeType: updatedTeam.representativeType,
-            teamLeader: updatedTeam.teamLeader,
-            coach: updatedTeam.coach,
-            sportType: updatedTeam.sportType,
-            esportGame: updatedTeam.esportGame,
-            customSportName: updatedTeam.customSportName,
-            minParticipants: updatedTeam.minParticipants,
-            maxParticipants: updatedTeam.maxParticipants,
-          };
           const { error } = await supabase.from('teams').upsert([{
             id: updatedTeam.id,
             name: updatedTeam.name,
             event_id: updatedTeam.eventId,
-            members: updatedTeam.members,
-            players: updatedTeam.players,
-            stats: { ...updatedTeam.stats, metadata: teamMetadata },
+            members: updatedTeam.players?.length ? updatedTeam.players : updatedTeam.members,
             status: updatedTeam.status,
             coach_name: updatedTeam.coach?.fullName || '',
             school_name: updatedTeam.schoolOrganization,
