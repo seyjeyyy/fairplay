@@ -578,11 +578,11 @@ export default function Landing() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 22 }}>
-                    <button onClick={() => navigate(`/participant/register?eventId=${event.id}`)} style={{ flex: '1 1 150px', border: 'none', borderRadius: 12, padding: '12px 14px', background: 'linear-gradient(135deg,#2563eb,#0ea5e9)', color: '#fff', fontWeight: 900, cursor: 'pointer' }}>
-                      Register
+                    <button onClick={() => navigate(`/events/${event.id}`)} style={{ flex: '1 1 130px', border: 'none', borderRadius: 12, padding: '12px 14px', background: 'linear-gradient(135deg,#2563eb,#0ea5e9)', color: '#fff', fontWeight: 900, cursor: 'pointer' }}>
+                      View Live Preview
                     </button>
-                    <button onClick={() => navigate(`/events/${event.id}`)} style={{ flex: '1 1 130px', border: '1px solid #bfdbfe', borderRadius: 12, padding: '12px 14px', background: '#fff', color: '#1d4ed8', fontWeight: 800, cursor: 'pointer' }}>
-                      Preview
+                    <button onClick={() => navigate(`/events/${event.id}/leaderboard`)} style={{ flex: '1 1 130px', border: '1px solid #bfdbfe', borderRadius: 12, padding: '12px 14px', background: '#fff', color: '#1d4ed8', fontWeight: 800, cursor: 'pointer' }}>
+                      Leaderboard
                     </button>
                   </div>
                 </div>

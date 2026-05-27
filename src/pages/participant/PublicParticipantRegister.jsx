@@ -25,6 +25,17 @@ function formatDate(raw) {
   } catch { return raw; }
 }
 
+function isRegistrationClosed(event) {
+  const status = String(event?.status || '').toLowerCase();
+  if (['active', 'ongoing', 'live', 'completed', 'archived'].includes(status)) return true;
+  const start = event?.startDate || event?.start_date;
+  const end = event?.endDate || event?.end_date || start;
+  const startTime = start ? new Date(start).getTime() : 0;
+  const endTime = end ? new Date(end).getTime() : startTime;
+  const now = Date.now();
+  return Boolean(startTime && startTime <= now && (!endTime || endTime >= now));
+}
+
 function getSubEventName(subEvent) {
   return String(subEvent?.name || subEvent?.title || '').trim();
 }
@@ -72,6 +83,10 @@ export default function PublicParticipantRegister() {
       );
       if (!ev) { setPhase('error'); return; }
       setEvent(ev);
+      if (isRegistrationClosed(ev)) {
+        setPhase('closed');
+        return;
+      }
       const firstSubEvent = (ev.subEvents || []).find((subEvent) => getSubEventName(subEvent));
       if (firstSubEvent) {
         setSelectedSubEventId(String(firstSubEvent.id));
@@ -107,6 +122,11 @@ export default function PublicParticipantRegister() {
 
     try {
       const currentEvent = useEventStore.getState().getEventById(eventId);
+      if (isRegistrationClosed(currentEvent)) {
+        setErrorMsg('Registration is closed because this event is already ongoing.');
+        setSubmitting(false);
+        return;
+      }
       const existing = currentEvent?.contestants || [];
       const availableSubEvents = (currentEvent?.subEvents || []).filter((subEvent) => getSubEventName(subEvent));
       const requiresSubEvent = availableSubEvents.length > 0;
@@ -318,6 +338,26 @@ export default function PublicParticipantRegister() {
         <i className="bi bi-exclamation-triangle" style={{ fontSize: 48, color: '#ef4444', marginBottom: 16 }} />
         <div style={{ fontWeight: 800, fontSize: 20, color: '#0f172a', marginBottom: 8 }}>Event not found</div>
         <p style={{ color: '#64748b' }}>This registration link is invalid or has expired.</p>
+      </div>
+    );
+  }
+
+  if (phase === 'closed') {
+    return (
+      <div style={fullPage}>
+        <div style={card}>
+          <div style={{ textAlign: 'center' }}>
+            <i className="bi bi-lock-fill" style={{ fontSize: 48, color: '#f59e0b', marginBottom: 16 }} />
+            <h1 style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', marginBottom: 8 }}>Registration Closed</h1>
+            <p style={{ color: '#64748b', fontSize: 14, lineHeight: 1.7, marginBottom: 18 }}>
+              {event?.title || 'This event'} is already ongoing, so new registrations are no longer accepted.
+            </p>
+            <a href={`/events/${eventId}`} style={{ ...secondaryActionButton, textDecoration: 'none' }}>
+              <i className="bi bi-eye" />
+              View Event Preview
+            </a>
+          </div>
+        </div>
       </div>
     );
   }
