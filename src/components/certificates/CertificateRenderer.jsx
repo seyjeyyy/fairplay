@@ -38,6 +38,14 @@ function fitFontSize(text, baseSize, compactSize, maxLength) {
   return String(text || '').length > maxLength ? compactSize : baseSize;
 }
 
+function certificateTitleSize(title, isJudgeCertificate) {
+  const length = String(title || '').length;
+  if (isJudgeCertificate) return length > 26 ? 42 : 46;
+  if (length > 30) return 48;
+  if (length > 24) return 54;
+  return 60;
+}
+
 function isImageTemplate(template) {
   return template?.customTemplateDataUrl && String(template.customTemplateType || '').startsWith('image/');
 }
@@ -129,7 +137,7 @@ const CertificateRenderer = forwardRef(function CertificateRenderer({ certificat
   const certTitle  = isJudgeCertificate
     ? tmpl.judgeTitle || 'Certificate of Appreciation'
     : tmpl.participantTitle || tmpl.title || 'Certificate of Achievement';
-  const titleSize  = certTitle.length > 28 ? 56 : 64;
+  const titleSize  = certificateTitleSize(certTitle, isJudgeCertificate);
   const logoSrc    = tmpl.logoUrl          || btechLogo;
   const message    = isJudgeCertificate
     ? tmpl.judgeMessage || 'Presented in appreciation of fair judging, professional evaluation, and service as an official for this event.'
@@ -229,10 +237,10 @@ const CertificateRenderer = forwardRef(function CertificateRenderer({ certificat
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(7,48,71,0.03) 1px, transparent 1px)', backgroundSize: '24px 24px', zIndex: 0, pointerEvents: 'none' }} />
 
         {/* ── Left: text ── */}
-        <div style={{ flex: 1, padding: '22px 28px 18px 40px', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
+        <div style={{ flex: '1 1 auto', minWidth: 0, padding: '22px 22px 18px 40px', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
 
           {/* Certificate title — same line, no separator */}
-          <div style={{ marginBottom: 14, paddingLeft: 8, overflow: 'visible' }}>
+          <div style={{ marginBottom: 14, paddingLeft: 8, overflow: 'hidden', width: '100%' }}>
             <div style={{
               color: '#073047',
               fontFamily: '"Brush Script MT","Segoe Script",cursive',
@@ -241,7 +249,9 @@ const CertificateRenderer = forwardRef(function CertificateRenderer({ certificat
               lineHeight: 1.05,
               textShadow: '2px 3px 0 rgba(246,201,69,0.28)',
               whiteSpace: 'nowrap',
-              maxWidth: 610,
+              maxWidth: '100%',
+              overflow: 'hidden',
+              textOverflow: 'clip',
               paddingLeft: 4,
             }}>
               {certTitle}
