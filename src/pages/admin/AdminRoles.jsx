@@ -44,7 +44,7 @@ export default function AdminRoles() {
   };
 
   return (
-    <DashboardLayout title="Approval Workflow" subtitle="Review the institute-to-OSDS approval chain and simulate decision flow">
+    <DashboardLayout title="Approval Workflow" subtitle="Review and update the live institute-to-OSDS approval chain">
       <div style={{
         background: '#ffffff',
         border: '1px solid #e2e8f0',

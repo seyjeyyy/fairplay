@@ -27,10 +27,6 @@ import useJudgeStore from '../../store/judgeStore';
 import useRegistrationStore from '../../store/registrationStore';
 import useScoreStore from '../../store/scoreStore';
 
-const STORAGE = {
-  used: '2.4 GB', total: '10 GB', percentage: 24,
-};
-
 const FALLBACK_IMAGES = {
   tournament: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=640&h=360&fit=crop',
   sportsfest: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=640&h=360&fit=crop',
@@ -112,7 +108,7 @@ export default function AdminDashboard() {
     const checkedIn = attendance.filter((row) => row.checkInStatus === 'checked-in').length;
     const imagesConnected = events.filter(hasEventImage).length;
     const scoringEvents = uniqueCount(scoreRows.map((score) => score.eventId));
-    const totalUsers = Math.max(users.length, organizers + judges.length + totalParticipants);
+    const totalUsers = users.length;
 
     return {
       totalUsers,
@@ -237,15 +233,19 @@ export default function AdminDashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.3fr)', gap: 20, alignItems: 'start' }}>
           <div style={{ display: 'grid', gap: 20 }}>
             <div style={cardStyle}>
-              <h3 style={cardTitleStyle}><Database size={16} /> Storage Usage</h3>
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ fontSize: 13, color: '#64748b' }}>{STORAGE.used} used of {STORAGE.total}</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: STORAGE.percentage > 80 ? '#ef4444' : '#2563eb' }}>{STORAGE.percentage}%</span>
-                </div>
-                <div style={{ height: 8, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${STORAGE.percentage}%` }} style={{ height: '100%', background: 'linear-gradient(90deg, #60a5fa, #2563eb)', borderRadius: 4 }} />
-                </div>
+              <h3 style={cardTitleStyle}><Database size={16} /> Database Records</h3>
+              <div style={{ display: 'grid', gap: 10 }}>
+                {[
+                  { label: 'Users', value: analytics.totalUsers },
+                  { label: 'Events', value: analytics.totalEvents },
+                  { label: 'Registrations', value: analytics.registrations },
+                  { label: 'Scores', value: analytics.totalScores },
+                ].map((item) => (
+                  <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: 13, color: '#64748b', fontWeight: 700 }}>{item.label}</span>
+                    <span style={{ fontSize: 18, color: '#2563eb', fontWeight: 900 }}>{item.value}</span>
+                  </div>
+                ))}
               </div>
             </div>
 

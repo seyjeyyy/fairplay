@@ -1,10 +1,8 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import useAILogsStore from '../../store/aiLogsStore';
 
 export default function AdminAIMonitor() {
-  const [timeframe] = useState('all');
   const { logs, stats, clearLogs } = useAILogsStore();
 
   const successRate = stats.totalRequests > 0 ? Math.round((stats.successCount / stats.totalRequests) * 100) : 0;
@@ -54,10 +52,10 @@ export default function AdminAIMonitor() {
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
           <div>
             <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 4, color: '#0f172a' }}>Recent AI Requests</h3>
-            <p style={{ margin: 0, color: '#64748b', fontSize: 13 }}>Local demo logs for criteria generation and fallback behavior.</p>
+            <p style={{ margin: 0, color: '#64748b', fontSize: 13 }}>Actual AI request logs captured by the application.</p>
           </div>
           <button onClick={clearLogs} style={{ border: '1px solid rgba(239,68,68,0.24)', background: 'rgba(239,68,68,0.08)', color: '#fca5a5', borderRadius: 10, padding: '10px 14px', cursor: 'pointer', fontWeight: 700 }}>
-            Clear Local Logs
+            Clear Logs
           </button>
         </div>
 
