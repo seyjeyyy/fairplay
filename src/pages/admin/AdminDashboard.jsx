@@ -143,7 +143,7 @@ export default function AdminDashboard() {
                 <span style={{ width: 28, height: 28, borderRadius: 10, background: 'rgba(37,99,235,0.1)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
                   <Database size={16} />
                 </span>
-                Storage Usage
+                Storage Usage!
               </h3>
               <div style={{ marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
