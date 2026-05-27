@@ -1,5 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { Suspense, lazy, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+import { Component, Suspense, lazy, useEffect } from 'react';
 import useAuthStore from './store/authStore';
 import ToastContainer from './components/ui/Toast';
 import GlobalAuthModal from './components/auth/GlobalAuthModal';
@@ -65,6 +65,29 @@ const RegistrationSuccess = lazy(() => import('./pages/participant/RegistrationS
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 const BracketsPage = lazy(() => import('./pages/BracketsPage'));
 const LeaderboardPage = lazy(() => import('./pages/LeaderboardPage'));
+
+class AppErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error) {
+    console.error('FairPlay page error:', error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <AppErrorFallback onRetry={() => this.setState({ hasError: false })} />;
+    }
+
+    return this.props.children;
+  }
+}
 
 function ProtectedRoute({ children, role, roles }) {
   const { user, token, loading, initialized } = useAuthStore();
@@ -142,6 +165,136 @@ function LoadingFallback() {
   );
 }
 
+function AppErrorFallback({ onRetry }) {
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #eff6ff, #f0f9ff)',
+        display: 'grid',
+        placeItems: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 460,
+          background: '#ffffff',
+          border: '1px solid #fecaca',
+          borderRadius: 24,
+          padding: 32,
+          textAlign: 'center',
+          boxShadow: '0 20px 60px rgba(239,68,68,0.10)',
+        }}
+      >
+        <i className="bi bi-exclamation-triangle" style={{ fontSize: 46, color: '#ef4444', marginBottom: 16 }} />
+        <h1 style={{ margin: '0 0 10px', fontSize: 24, fontWeight: 900, color: '#0f172a' }}>Something went wrong</h1>
+        <p style={{ margin: '0 0 22px', color: '#64748b', fontSize: 14, lineHeight: 1.7 }}>
+          FairPlay could not load this page correctly. Try again, or return to the home page and open the link again.
+        </p>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={onRetry}
+            style={{
+              padding: '11px 16px',
+              borderRadius: 12,
+              border: 'none',
+              background: 'linear-gradient(135deg,#1d4ed8,#0ea5e9)',
+              color: '#fff',
+              fontWeight: 800,
+              cursor: 'pointer',
+            }}
+          >
+            Try again
+          </button>
+          <Link
+            to="/"
+            style={{
+              padding: '11px 16px',
+              borderRadius: 12,
+              border: '1px solid #bfdbfe',
+              background: '#eff6ff',
+              color: '#1d4ed8',
+              fontWeight: 800,
+              textDecoration: 'none',
+            }}
+          >
+            Go home
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AppNotFound() {
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #eff6ff, #f0f9ff)',
+        color: '#0f172a',
+        display: 'grid',
+        placeItems: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 460,
+          background: '#ffffff',
+          border: '1px solid #bfdbfe',
+          borderRadius: 24,
+          padding: 32,
+          textAlign: 'center',
+          boxShadow: '0 20px 60px rgba(37,99,235,0.12)',
+        }}
+      >
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: 20,
+            background: 'linear-gradient(135deg,#2563eb,#0ea5e9)',
+            color: '#fff',
+            display: 'grid',
+            placeItems: 'center',
+            margin: '0 auto 18px',
+            fontSize: 28,
+          }}
+        >
+          <i className="bi bi-link-45deg" />
+        </div>
+        <h1 style={{ margin: '0 0 10px', fontSize: 24, fontWeight: 900 }}>Link not found</h1>
+        <p style={{ margin: '0 0 24px', color: '#64748b', fontSize: 14, lineHeight: 1.7 }}>
+          This FairPlay link is invalid, expired, or no longer available. Check the QR code or ask the organizer for a fresh link.
+        </p>
+        <Link
+          to="/"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            padding: '12px 18px',
+            borderRadius: 14,
+            background: 'linear-gradient(135deg,#1d4ed8,#0ea5e9)',
+            color: '#fff',
+            fontWeight: 800,
+            textDecoration: 'none',
+          }}
+        >
+          <i className="bi bi-house" />
+          Go to FairPlay
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const initAuth = useAuthStore((state) => state.initAuth);
 
@@ -159,8 +312,9 @@ export default function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <GlobalAuthModal />
-      <Suspense fallback={<LoadingFallback />}>
-        <Routes>
+      <AppErrorBoundary>
+        <Suspense fallback={<LoadingFallback />}>
+          <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/premium" element={<PremiumLanding />} />
           <Route path="/login" element={<AuthEntryRedirect mode="login" />} />
@@ -239,9 +393,10 @@ export default function App() {
           <Route path="/leaderboard" element={<ProtectedRoute><LeaderboardPage /></ProtectedRoute>} />
 
           <Route path="/dashboard" element={<DashboardRedirect />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
+          <Route path="*" element={<AppNotFound />} />
+          </Routes>
+        </Suspense>
+      </AppErrorBoundary>
       <AIChatbot />
       <ToastContainer />
     </Router>

@@ -245,7 +245,7 @@ export default function Sidebar({ isOpen, isMobile, onToggle }) {
   const menu = NAV_GROUPS[role] || NAV_GROUPS.participant;
   const mobile = typeof isMobile === 'boolean' ? isMobile : typeof window !== 'undefined' ? window.innerWidth < 1024 : false;
   const expanded = isOpen;
-  const visible = true;
+  const visible = !mobile || expanded;
   const [openGroups, setOpenGroups] = useState({});
   const [hoveredGroup, setHoveredGroup] = useState(null);
 
@@ -261,6 +261,7 @@ export default function Sidebar({ isOpen, isMobile, onToggle }) {
     <>
       {expanded && mobile && (
         <div
+          onClick={onToggle}
           style={{
             position: 'fixed',
             inset: 0,

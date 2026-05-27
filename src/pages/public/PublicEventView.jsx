@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import useEventStore from '../../store/eventStore';
@@ -8,14 +8,39 @@ export default function PublicEventView() {
   const { id } = useParams();
   const { events, fetchEvents } = useEventStore();
   const { tournaments, fetchTournaments } = useTournamentStore();
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    fetchEvents();
-    fetchTournaments(id);
+    let mounted = true;
+
+    async function loadPublicEvent() {
+      try {
+        await Promise.all([fetchEvents(), fetchTournaments(id)]);
+      } finally {
+        if (mounted) {
+          setLoaded(true);
+        }
+      }
+    }
+
+    loadPublicEvent();
+    return () => {
+      mounted = false;
+    };
   }, [fetchEvents, fetchTournaments, id]);
 
   const event = events.find((entry) => String(entry.id) === String(id)) || null;
   const tournament = tournaments.find((entry) => String(entry.eventId) === String(id)) || null;
+
+  if (!event && !loaded) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, padding: 40 }}>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <i className="bi bi-arrow-repeat" style={{ fontSize: 40, color: '#67e8f9', animation: 'spin 1s linear infinite' }} />
+        <p style={{ color: '#a0aec0' }}>Loading event...</p>
+      </div>
+    );
+  }
 
   if (!event) {
     return (

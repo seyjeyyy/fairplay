@@ -91,6 +91,9 @@ html {
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -100,15 +103,33 @@ body {
   color: var(--color-text-primary);
   background-color: var(--color-bg-primary);
   min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 #root {
   width: 100%;
+  max-width: 100%;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+button,
+input,
+textarea,
+select {
+  max-width: 100%;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -278,6 +299,114 @@ a:hover {
   h1 { font-size: var(--font-size-2xl); }
   h2 { font-size: var(--font-size-xl); }
   h3 { font-size: var(--font-size-lg); }
+}
+
+.fairplay-dashboard-main,
+.fairplay-dashboard-content {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.fairplay-dashboard-content,
+.fairplay-dashboard-content * {
+  min-width: 0;
+}
+
+.fairplay-dashboard-content table {
+  width: 100%;
+}
+
+@media (max-width: 1023px) {
+  .fairplay-dashboard-main {
+    width: 100% !important;
+    margin-left: 0 !important;
+    padding:
+      16px
+      max(12px, env(safe-area-inset-right))
+      24px
+      max(12px, env(safe-area-inset-left)) !important;
+    overflow-x: clip;
+  }
+
+  .fairplay-dashboard-content {
+    max-width: 100% !important;
+  }
+
+  .fairplay-dashboard-content [style*="display: flex"] {
+    flex-wrap: wrap !important;
+  }
+
+  .fairplay-dashboard-content [style*="grid-template-columns"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .fairplay-dashboard-content [style*="width:"],
+  .fairplay-dashboard-content [style*="max-width:"],
+  .fairplay-dashboard-content [style*="min-width:"] {
+    max-width: 100% !important;
+  }
+
+  .fairplay-dashboard-content section,
+  .fairplay-dashboard-content article,
+  .fairplay-dashboard-content form,
+  .fairplay-dashboard-content fieldset,
+  .fairplay-dashboard-content [style*="border-radius"] {
+    max-width: 100%;
+  }
+
+  .fairplay-dashboard-content input,
+  .fairplay-dashboard-content textarea,
+  .fairplay-dashboard-content select,
+  .fairplay-dashboard-content button {
+    width: auto;
+    max-width: 100%;
+  }
+
+  .fairplay-dashboard-content table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 640px) {
+  [style*="grid-template-columns: 1fr 1fr"],
+  [style*="grid-template-columns: repeat(2"],
+  [style*="minmax(300px"],
+  [style*="minmax(320px"],
+  [style*="minmax(340px"],
+  [style*="minmax(350px"],
+  [style*="minmax(360px"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  [style*="width: 320px"],
+  [style*="width: 340px"],
+  [style*="width: 360px"],
+  [style*="width: 400px"],
+  [style*="width: 420px"],
+  [style*="width: 500px"],
+  [style*="width: 600px"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .fairplay-dashboard-main {
+    margin-top: 64px !important;
+    min-height: calc(100vh - 64px) !important;
+  }
+
+  .fairplay-dashboard-content [style*="padding: 24px"],
+  .fairplay-dashboard-content [style*="padding: 28px"],
+  .fairplay-dashboard-content [style*="padding: 32px"] {
+    padding: 16px !important;
+  }
+
+  .fairplay-dashboard-content [style*="gap: 24px"],
+  .fairplay-dashboard-content [style*="gap: 28px"],
+  .fairplay-dashboard-content [style*="gap: 32px"] {
+    gap: 16px !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

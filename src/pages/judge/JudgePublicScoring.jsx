@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import useEventStore from '../../store/eventStore';
 import useScoreStore from '../../store/scoreStore';
 
 export default function JudgePublicScoring() {
   const { eventId } = useParams();
-  const { events, fetchEvents } = useEventStore();
+  const { events, loading: eventsLoading, error: eventsError, fetchEvents } = useEventStore();
   const { fetchScores, submitScore, updateScore, getScoreByKey } = useScoreStore();
 
   const [phase, setPhase] = useState('identify');
@@ -18,8 +18,27 @@ export default function JudgePublicScoring() {
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [eventsLoaded, setEventsLoaded] = useState(false);
 
-  useEffect(() => { fetchEvents(); }, [fetchEvents]);
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadEvents() {
+      try {
+        await fetchEvents();
+      } finally {
+        if (mounted) {
+          setEventsLoaded(true);
+        }
+      }
+    }
+
+    loadEvents();
+    return () => {
+      mounted = false;
+    };
+  }, [fetchEvents]);
+
   useEffect(() => { if (eventId) fetchScores(eventId); }, [fetchScores, eventId]);
 
   useEffect(() => {
@@ -115,12 +134,24 @@ export default function JudgePublicScoring() {
   }
 
   // ─── Loading ──────────────────────────────────────────────────────────────
-  if (!event && events.length > 0) {
+  if (!event && eventsLoaded && !eventsLoading) {
     return (
       <div style={S.fullPage}>
-        <i className="bi bi-exclamation-triangle" style={{ fontSize: 48, color: '#ef4444', marginBottom: 16 }} />
-        <div style={{ fontWeight: 800, fontSize: 20, color: '#0f172a', marginBottom: 8 }}>Event not found</div>
-        <p style={{ color: '#64748b' }}>This judge scoring link is invalid or the event no longer exists.</p>
+        <div style={{ ...S.gateCard, textAlign: 'center' }}>
+          <i className="bi bi-exclamation-triangle" style={{ fontSize: 48, color: '#ef4444', marginBottom: 16 }} />
+          <div style={{ fontWeight: 800, fontSize: 20, color: '#0f172a', marginBottom: 8 }}>
+            Judge link not available
+          </div>
+          <p style={{ color: '#64748b', marginBottom: 20, lineHeight: 1.7 }}>
+            {eventsError
+              ? 'FairPlay could not load event data right now. Please refresh or ask the organizer to verify the event is published.'
+              : 'This judge scoring link is invalid, expired, or the event was removed.'}
+          </p>
+          <Link to="/" style={S.secondaryLink}>
+            <i className="bi bi-house" />
+            Back to FairPlay
+          </Link>
+        </div>
       </div>
     );
   }
@@ -512,6 +543,20 @@ const S = {
     gap: 8,
     boxShadow: '0 8px 20px rgba(29,78,216,0.28)',
     fontFamily: 'inherit',
+  },
+  secondaryLink: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: '11px 16px',
+    borderRadius: 12,
+    background: '#eff6ff',
+    border: '1px solid #bfdbfe',
+    color: '#1d4ed8',
+    fontSize: 14,
+    fontWeight: 800,
+    textDecoration: 'none',
   },
   errorBox: {
     padding: '10px 14px',

@@ -30,7 +30,10 @@ export default function DashboardLayout({ children, title, subtitle }) {
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [location.pathname]);
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  }, [location.pathname, isMobile]);
 
   useEffect(() => {
     window.localStorage.setItem(SIDEBAR_STATE_KEY, String(sidebarOpen));
@@ -61,7 +64,7 @@ export default function DashboardLayout({ children, title, subtitle }) {
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #f8fbff 0%, #e0f2fe 100%)' }}>
-      <Navbar />
+      <Navbar isMobile={isMobile} onMenuToggle={() => setSidebarOpen((current) => !current)} />
       <Sidebar
         isOpen={sidebarOpen}
         isMobile={isMobile}
@@ -69,6 +72,7 @@ export default function DashboardLayout({ children, title, subtitle }) {
       />
 
       <motion.main
+        className="fairplay-dashboard-main"
         key={location.pathname}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -83,7 +87,7 @@ export default function DashboardLayout({ children, title, subtitle }) {
           boxSizing: 'border-box',
         }}
       >
-        <div style={{ width: '100%', maxWidth: 1680, margin: '0 auto' }}>
+        <div className="fairplay-dashboard-content" style={{ width: '100%', maxWidth: 1680, margin: '0 auto' }}>
           {(title || subtitle) && (
             <div style={{ marginBottom: 28 }}>
               {title && (
