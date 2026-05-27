@@ -208,10 +208,10 @@ export default function AdminDashboard() {
 
   return (
     <DashboardLayout title="Super Admin Dashboard" subtitle="Complete platform oversight connected to organizer activity">
-      <div style={{ display: 'grid', gap: 28 }}>
+      <div style={dashboardStackStyle}>
         <div>
           <h3 style={sectionHeadingStyle}>Overview</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+          <div style={statsGridStyle}>
             {overviewStats.map((stat, i) => (
               <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} style={{ ...statsCardStyle, borderLeft: `3px solid ${stat.color}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', width: '100%' }}>
@@ -230,7 +230,7 @@ export default function AdminDashboard() {
 
         <div>
           <h3 style={sectionHeadingStyle}>Operations</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+          <div style={statsGridStyle}>
             {operationsStats.map((stat, i) => (
               <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} style={{ ...statsCardStyle, borderLeft: `3px solid ${stat.color}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', width: '100%' }}>
@@ -247,8 +247,8 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.3fr)', gap: 20, alignItems: 'start' }}>
-          <div style={{ display: 'grid', gap: 20 }}>
+        <div style={mainDashboardGridStyle}>
+          <div style={sidePanelStackStyle}>
             <div style={cardStyle}>
               <h3 style={cardTitleStyle}><Database size={16} /> Database Records</h3>
               <div style={{ display: 'grid', gap: 10 }}>
@@ -297,7 +297,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div style={cardStyle}>
+          <div style={{ ...cardStyle, minWidth: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
               <h3 style={cardTitleStyle}><Calendar size={16} /> All Organizer Events</h3>
               <div style={{ display: 'flex', gap: 12 }}>
@@ -397,6 +397,33 @@ const sectionHeadingStyle = {
   textTransform: 'uppercase',
   letterSpacing: '0.12em',
   marginBottom: 12,
+};
+
+const dashboardStackStyle = {
+  display: 'grid',
+  gap: 24,
+  width: '100%',
+};
+
+const statsGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
+  gap: 16,
+  alignItems: 'stretch',
+};
+
+const mainDashboardGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))',
+  gap: 20,
+  alignItems: 'start',
+  width: '100%',
+};
+
+const sidePanelStackStyle = {
+  display: 'grid',
+  gap: 20,
+  minWidth: 0,
 };
 
 const cardTitleStyle = {
