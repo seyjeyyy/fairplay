@@ -6,6 +6,7 @@ import useAuthStore from '../../store/authStore';
 import useEventStore from '../../store/eventStore';
 import useNotificationStore from '../../store/notificationStore';
 import useScoreStore from '../../store/scoreStore';
+import useAudienceScoreStore from '../../store/audienceScoreStore';
 import { finalizeEventWorkflow } from '../../services/automationService';
 
 function formatTimestamp(value) {
@@ -19,6 +20,7 @@ export default function OrganizerScoring() {
   const { events, fetchEvents } = useEventStore();
   const { success } = useNotificationStore();
   const { fetchScores, getLiveFeed, calculateLeaderboard } = useScoreStore();
+  const { fetchAudienceScores, getAudienceSummary } = useAudienceScoreStore();
   const eventIdFromUrl = searchParams.get('eventId');
   const [selectedEvent, setSelectedEvent] = useState(eventIdFromUrl || '');
   const [activeTab, setActiveTab] = useState('leaderboard');
@@ -31,7 +33,8 @@ export default function OrganizerScoring() {
 
   useEffect(() => {
     fetchScores(selectedEvent || undefined);
-  }, [fetchScores, selectedEvent]);
+    if (selectedEvent) fetchAudienceScores(selectedEvent);
+  }, [fetchAudienceScores, fetchScores, selectedEvent]);
 
   const activeEvents = events.filter((event) => event.status === 'active' || event.status === 'upcoming');
   const selected = events.find((event) => String(event.id) === String(selectedEvent)) || null;
@@ -43,6 +46,11 @@ export default function OrganizerScoring() {
     () => (selected ? calculateLeaderboard(selected.id, selected.criteria || []) : []),
     [calculateLeaderboard, selected]
   );
+  const audienceSummary = useMemo(
+    () => (selected ? getAudienceSummary(selected.id) : { totalSubmissions: 0, byContestant: {} }),
+    [getAudienceSummary, selected]
+  );
+  const audienceEnabled = Boolean(selected?.audienceImpactEnabled ?? selected?.audienceImpact);
 
   const handleFinalize = async () => {
     if (!selected) return;
@@ -75,6 +83,7 @@ export default function OrganizerScoring() {
             {[
               { id: 'live', label: 'Live Feed' },
               { id: 'leaderboard', label: 'Leaderboard' },
+              ...(audienceEnabled ? [{ id: 'audience', label: 'Audience Impact' }] : []),
               { id: 'finalize', label: 'Finalize' },
             ].map((tab) => (
               <button
@@ -164,12 +173,38 @@ export default function OrganizerScoring() {
                         <div>
                           <span style={{ fontWeight: 600, fontSize: 14, color: '#0f172a', display: 'block' }}>{item.contestantName}</span>
                           <span style={{ fontSize: 12, color: '#64748b' }}>{item.totalScores} submission{item.totalScores === 1 ? '' : 's'}</span>
+                          {audienceEnabled && (
+                            <span style={{ display: 'block', fontSize: 11, color: '#059669', marginTop: 2 }}>
+                              Judges {(item.judgeAverage?.toFixed?.(2) ?? item.judgeAverage) || 0} · Audience {(item.audienceAverage?.toFixed?.(2) ?? item.audienceAverage) || 0}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <span style={{ fontSize: 20, fontWeight: 800, color: '#2563eb' }}>{item.averageScore}</span>
                     </div>
                   ))
                 )}
+              </div>
+            )}
+
+            {activeTab === 'audience' && audienceEnabled && (
+              <div>
+                <h3 style={sectionTitleStyle}>Audience Impact Results</h3>
+                <p style={sectionBodyStyle}>
+                  {audienceSummary.totalSubmissions} audience submission{audienceSummary.totalSubmissions === 1 ? '' : 's'} collected. Audience weight: {selected.audienceImpactWeight || 10}%.
+                </p>
+                {(selected.contestants || []).map((contestant) => {
+                  const row = audienceSummary.byContestant[String(contestant.id)];
+                  return (
+                    <div key={contestant.id} style={rowCardStyle}>
+                      <div>
+                        <p style={{ fontWeight: 700, color: '#0f172a', margin: 0 }}>{contestant.name || contestant.teamName}</p>
+                        <p style={{ color: '#64748b', fontSize: 12, margin: '4px 0 0' }}>{row?.count || 0} audience submission{row?.count === 1 ? '' : 's'}</p>
+                      </div>
+                      <span style={{ fontSize: 24, fontWeight: 900, color: '#059669' }}>{row ? row.averageScore.toFixed(2) : '--'}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
 

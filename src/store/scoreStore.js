@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { isSupabaseConfigured, supabase } from '../utils/supabaseClient';
 import useEventStore from './eventStore';
 import useNotificationStore from './notificationStore';
+import useAudienceScoreStore from './audienceScoreStore';
 
 function scoreKey(eventId, judgeId, contestantId) {
   return `${eventId}_${judgeId}_${contestantId}`;
@@ -285,6 +286,11 @@ const useScoreStore = create(
 
       calculateLeaderboard: (eventId, criteria) => {
         const eventScores = get().getScoresForEvent(eventId);
+        const event = findScoreEvent(eventId);
+        const audienceSummary = useAudienceScoreStore.getState().getAudienceSummary(eventId);
+        const audienceEnabled = Boolean(event?.audienceImpactEnabled ?? event?.audienceImpact);
+        const audienceWeight = audienceEnabled ? Math.min(Math.max(Number(event?.audienceImpactWeight || 10), 0), 100) : 0;
+        const judgeWeight = audienceEnabled ? 100 - audienceWeight : 100;
         const contestantScores = {};
 
         eventScores.forEach((score) => {
@@ -302,13 +308,38 @@ const useScoreStore = create(
           contestantScores[score.contestantId].scores.push(result);
         });
 
+        Object.entries(audienceSummary.byContestant || {}).forEach(([id, audience]) => {
+          if (!contestantScores[id]) {
+            contestantScores[id] = {
+              total: 0,
+              count: 0,
+              scores: [],
+              contestantName: audience.contestantName || `Contestant ${id}`,
+            };
+          }
+        });
+
         return Object.entries(contestantScores)
-          .map(([id, data]) => ({
+          .map(([id, data]) => {
+            const judgeAverage = data.count > 0 ? Math.round((data.total / data.count) * 100) / 100 : 0;
+            const audience = audienceSummary.byContestant?.[id] || null;
+            const audienceAverage = audience?.averageScore || 0;
+            const finalScore = audienceEnabled
+              ? Math.round(((judgeAverage * judgeWeight) + (audienceAverage * audienceWeight)) * 100) / 10000
+              : judgeAverage;
+
+            return {
             contestantId: id,
             contestantName: data.contestantName,
-            averageScore: Math.round((data.total / data.count) * 100) / 100,
+            averageScore: finalScore,
+            judgeAverage,
+            audienceAverage,
+            audienceSubmissions: audience?.count || 0,
+            audienceWeight,
+            judgeWeight,
             totalScores: data.count,
-          }))
+          };
+          })
           .sort((left, right) => right.averageScore - left.averageScore)
           .map((item, index) => ({ ...item, rank: index + 1 }));
       },

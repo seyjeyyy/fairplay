@@ -3,25 +3,27 @@ import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import useEventStore from '../../store/eventStore';
 import useScoreStore from '../../store/scoreStore';
+import useAudienceScoreStore from '../../store/audienceScoreStore';
 
 export default function PublicLeaderboard() {
   const { id } = useParams();
   const { events, fetchEvents } = useEventStore();
   const { fetchScores, calculateLeaderboard } = useScoreStore();
+  const { fetchAudienceScores } = useAudienceScoreStore();
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     async function load() {
       try {
-        await Promise.all([fetchEvents(), fetchScores(id)]);
+        await Promise.all([fetchEvents(), fetchScores(id), fetchAudienceScores(id)]);
       } finally {
         if (mounted) setLoaded(true);
       }
     }
     load();
     return () => { mounted = false; };
-  }, [fetchEvents, fetchScores, id]);
+  }, [fetchAudienceScores, fetchEvents, fetchScores, id]);
 
   const event = events.find((entry) => String(entry.id) === String(id)) || null;
   const contestants = Array.isArray(event?.contestants) ? event.contestants : [];
@@ -52,7 +54,7 @@ export default function PublicLeaderboard() {
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <p style={{ color: '#2563eb', fontSize: 12, fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 8 }}>Audience Leaderboard</p>
           <h1 style={{ fontSize: 'clamp(30px,5vw,48px)', fontWeight: 950, letterSpacing: '-0.04em', margin: 0 }}>{event?.title || 'Event'} Rankings</h1>
-          <p style={{ color: '#64748b', marginTop: 10 }}>{loaded ? 'Live scores and ranking updates from submitted judge scores.' : 'Loading leaderboard...'}</p>
+          <p style={{ color: '#64748b', marginTop: 10 }}>{loaded ? 'Live ranking from judges and Audience Impact when enabled.' : 'Loading leaderboard...'}</p>
         </div>
 
         <div style={{ background: '#ffffff', border: '1px solid #dbeafe', borderRadius: 24, overflow: 'hidden', boxShadow: '0 22px 60px rgba(37,99,235,0.10)' }}>
@@ -70,7 +72,10 @@ export default function PublicLeaderboard() {
                 </span>
                 <div style={{ minWidth: 0 }}>
                   <p style={{ fontWeight: 900, fontSize: 16, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.contestantName}</p>
-                  <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0' }}>{item.totalScores ? `${item.totalScores} submitted score${item.totalScores === 1 ? '' : 's'}` : 'Waiting for scores'}</p>
+                  <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0' }}>
+                    {item.totalScores ? `${item.totalScores} judge score${item.totalScores === 1 ? '' : 's'}` : 'Waiting for scores'}
+                    {item.audienceWeight ? ` · Audience ${item.audienceSubmissions || 0}` : ''}
+                  </p>
                 </div>
               </div>
               <span style={{ fontSize: 28, fontWeight: 950, color: item.rank === 1 ? '#b45309' : '#2563eb' }}>

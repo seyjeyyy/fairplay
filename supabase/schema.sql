@@ -89,6 +89,17 @@ create table if not exists public.scores (
   updated_at timestamptz default timezone('utc', now())
 );
 
+create table if not exists public.audience_scores (
+  id text primary key,
+  event_id bigint references public.events(id) on delete cascade,
+  contestant_id text not null,
+  contestant_name text,
+  voter_key text not null,
+  score numeric(10,2) not null check (score >= 1 and score <= 10),
+  created_at timestamptz default timezone('utc', now()),
+  unique(event_id, contestant_id, voter_key)
+);
+
 create table if not exists public.judges (
   id bigint primary key,
   name text not null,
@@ -278,6 +289,10 @@ create table if not exists public.ai_detections (
 
 alter table public.events add column if not exists description text;
 alter table public.events add column if not exists metadata jsonb default '{}'::jsonb;
+alter table public.events add column if not exists audience_impact_enabled boolean default false;
+alter table public.events add column if not exists audience_impact_weight numeric(5,2) default 10;
+alter table public.events add column if not exists audience_voting_open boolean default false;
+alter table public.events add column if not exists audience_qr_token text;
 
 alter table public.teams add column if not exists players jsonb default '[]'::jsonb;
 alter table public.teams add column if not exists stats jsonb default '{}'::jsonb;
@@ -470,6 +485,7 @@ alter table public.events enable row level security;
 alter table public.teams enable row level security;
 alter table public.registrations enable row level security;
 alter table public.scores enable row level security;
+alter table public.audience_scores enable row level security;
 alter table public.judges enable row level security;
 alter table public.judge_assignments enable row level security;
 alter table public.attendance enable row level security;
@@ -535,6 +551,13 @@ with check (true);
 drop policy if exists "Allow anon full access to scores" on public.scores;
 create policy "Allow anon full access to scores"
 on public.scores for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists "Allow anon full access to audience scores" on public.audience_scores;
+create policy "Allow anon full access to audience scores"
+on public.audience_scores for all
 to anon, authenticated
 using (true)
 with check (true);

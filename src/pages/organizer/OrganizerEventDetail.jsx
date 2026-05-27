@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import useEventStore from '../../store/eventStore';
+import useAudienceScoreStore from '../../store/audienceScoreStore';
 
 const TOURNAMENT_EVENT_TYPES = ['tournament', 'sportsfest', 'esports', 'sports'];
 
@@ -169,6 +170,7 @@ export default function OrganizerEventDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { getEventById, fetchEvents, updateEvent } = useEventStore();
+  const { fetchAudienceScores, getAudienceSummary } = useAudienceScoreStore();
   const [fullscreenQR, setFullscreenQR] = useState(null);
   const [showAddContestant, setShowAddContestant] = useState(false);
   const [showAddScorer, setShowAddScorer] = useState(false);
@@ -176,7 +178,8 @@ export default function OrganizerEventDetail() {
 
   useEffect(() => {
     fetchEvents();
-  }, [fetchEvents]);
+    fetchAudienceScores(id);
+  }, [fetchAudienceScores, fetchEvents, id]);
 
   const event = getEventById(id);
 
@@ -236,6 +239,13 @@ export default function OrganizerEventDetail() {
 
   const judgeQRValue = `${window.location.origin}/judge/open/${event.id}`;
   const participantQRValue = `${window.location.origin}/participant/register?eventId=${event.id}`;
+  const audienceQRValue = `${window.location.origin}/audience/${event.id}`;
+  const audienceEnabled = Boolean(event.audienceImpactEnabled ?? event.audienceImpact);
+  const audienceSummary = getAudienceSummary(event.id);
+
+  async function handleToggleAudienceVoting() {
+    await updateEvent(id, { audienceVotingOpen: !event.audienceVotingOpen });
+  }
 
   return (
     <>
@@ -462,6 +472,46 @@ export default function OrganizerEventDetail() {
             </button>
           </div>
         </div>
+
+        {audienceEnabled && (
+          <div style={card}>
+            <div style={eyebrow}>Audience Impact</div>
+            <h2 style={panelTitle}>Audience QR and Results</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) minmax(0, 1fr)', gap: 18, alignItems: 'start' }}>
+              <div style={{ display: 'grid', gap: 12, justifyItems: 'center' }}>
+                <div onClick={() => setFullscreenQR({ value: audienceQRValue, label: 'Audience Impact Scoring', code: null })} style={{ cursor: 'pointer', padding: 12, borderRadius: 16, border: '2px dashed #bbf7d0' }}>
+                  <QRCodeSVG value={audienceQRValue} size={170} bgColor="#ffffff" fgColor="#0f172a" level="H" includeMargin={false} />
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <button onClick={() => navigator.clipboard.writeText(audienceQRValue)} style={secondaryBtn}>
+                    <i className="bi bi-copy" /> Copy Link
+                  </button>
+                  <button onClick={handleToggleAudienceVoting} style={{ ...secondaryBtn, background: event.audienceVotingOpen ? '#fee2e2' : '#dcfce7', borderColor: event.audienceVotingOpen ? '#fecaca' : '#bbf7d0', color: event.audienceVotingOpen ? '#dc2626' : '#15803d' }}>
+                    <i className={`bi ${event.audienceVotingOpen ? 'bi-stop-circle' : 'bi-play-circle'}`} />
+                    {event.audienceVotingOpen ? 'Close Voting' : 'Open Voting'}
+                  </button>
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b', textAlign: 'center' }}>
+                  {audienceSummary.totalSubmissions} submissions - Voting {event.audienceVotingOpen ? 'open' : 'closed'}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gap: 10 }}>
+                {(event.contestants || []).map((contestant) => {
+                  const row = audienceSummary.byContestant[String(contestant.id)];
+                  return (
+                    <div key={contestant.id} style={{ ...nestedPanel, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                      <div>
+                        <div style={{ fontWeight: 800, color: '#0f172a' }}>{contestant.name || contestant.teamName}</div>
+                        <div style={{ fontSize: 12, color: '#64748b' }}>{row?.count || 0} audience submission{row?.count === 1 ? '' : 's'}</div>
+                      </div>
+                      <div style={{ fontSize: 22, fontWeight: 900, color: '#059669' }}>{row ? row.averageScore.toFixed(2) : '--'}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Scorer Assignments — tournament events only */}
         {TOURNAMENT_EVENT_TYPES.includes(event.eventType) && (

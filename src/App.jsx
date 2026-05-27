@@ -11,6 +11,7 @@ const PremiumLanding = lazy(() => import('./pages/public/PremiumLanding'));
 const PublicEventView = lazy(() => import('./pages/public/PublicEventView'));
 const PublicBrackets = lazy(() => import('./pages/public/PublicBrackets'));
 const PublicLeaderboard = lazy(() => import('./pages/public/PublicLeaderboard'));
+const AudienceScoring = lazy(() => import('./pages/public/AudienceScoring'));
 const QRInterceptor = lazy(() => import('./pages/public/QRInterceptor'));
 const QRResolver = lazy(() => import('./components/qr/QRResolver'));
 
@@ -330,6 +331,7 @@ export default function App() {
           <Route path="/events/:id" element={<PublicEventView />} />
           <Route path="/events/:id/brackets" element={<PublicBrackets />} />
           <Route path="/events/:id/leaderboard" element={<PublicLeaderboard />} />
+          <Route path="/audience/:eventId" element={<AudienceScoring />} />
           <Route path="/qr/:token" element={<QRInterceptor />} />
           <Route path="/scan/:token" element={<QRResolver />} />
 
