@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { isSupabaseConfigured, supabase } from '../utils/supabaseClient';
 import { mockEvents } from '../data/events';
 import { getBusinessActorId, matchesActorIdentity } from '../utils/identity';
+import useNotificationStore from './notificationStore';
 import {
   applyApprovalDecision,
   createDefaultApprovalWorkflow,
@@ -264,6 +265,7 @@ const useEventStore = create(
             loading: false,
             error: null,
           }));
+          await useNotificationStore.getState().notifyEventCreated(normalizedEvent);
           return normalizedEvent;
         }
 
@@ -304,6 +306,7 @@ const useEventStore = create(
             loading: false,
             error: null,
           }));
+          await useNotificationStore.getState().notifyEventCreated(createdEvent);
           return createdEvent;
         } catch (error) {
           console.error('Error creating event:', error.message);

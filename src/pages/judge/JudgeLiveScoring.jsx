@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import useEventStore from '../../store/eventStore';
+import useNotificationStore from '../../store/notificationStore';
 import { isSupabaseConfigured, supabase } from '../../utils/supabaseClient';
 
 const BUBBLE_STYLE = `
@@ -191,6 +192,7 @@ export default function JudgeLiveScoring() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const { fetchEvents } = useEventStore();
+  const { notifyScoreSubmitted } = useNotificationStore();
 
   const [event, setEvent] = useState(null);
   const [judge, setJudge] = useState(null);
@@ -321,9 +323,28 @@ export default function JudgeLiveScoring() {
         };
 
         await supabase.from('scores').upsert([scorePayload]);
+        await notifyScoreSubmitted({
+          ...scorePayload,
+          eventId: event.id,
+          judgeId: judge.judgeId,
+          contestantId,
+          contestantName: event.contestants?.find((contestant) => String(contestant.id) === String(contestantId))?.name || `Contestant ${contestantId}`,
+          eventTitle: event.title,
+          judgeName: judge.judgeName,
+        }, event, 'submitted');
       } catch {
         // Non-critical — state still updates locally
       }
+    } else {
+      await notifyScoreSubmitted({
+        id: `${event.id}_${judge.judgeId}_${contestantId}`,
+        eventId: event.id,
+        judgeId: judge.judgeId,
+        contestantId,
+        contestantName: event.contestants?.find((contestant) => String(contestant.id) === String(contestantId))?.name || `Contestant ${contestantId}`,
+        eventTitle: event.title,
+        judgeName: judge.judgeName,
+      }, event, 'submitted');
     }
 
     setSaving(false);

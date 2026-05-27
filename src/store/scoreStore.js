@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { isSupabaseConfigured, supabase } from '../utils/supabaseClient';
+import useEventStore from './eventStore';
+import useNotificationStore from './notificationStore';
 
 function scoreKey(eventId, judgeId, contestantId) {
   return `${eventId}_${judgeId}_${contestantId}`;
@@ -35,6 +37,12 @@ function normalizeScore(score) {
     locked: Boolean(score.locked),
     lockedAt: score.lockedAt || score.locked_at || null,
   };
+}
+
+function findScoreEvent(eventId) {
+  return useEventStore.getState().getEventById(eventId) ||
+    useEventStore.getState().events.find((event) => String(event.id) === String(eventId)) ||
+    null;
 }
 
 const useScoreStore = create(
@@ -108,6 +116,7 @@ const useScoreStore = create(
         }));
 
         if (!isSupabaseConfigured) {
+          await useNotificationStore.getState().notifyScoreSubmitted(nextScore, findScoreEvent(eventId), 'submitted');
           return nextScore;
         }
 
@@ -135,10 +144,12 @@ const useScoreStore = create(
 
           const normalized = normalizeScore(data || nextScore);
           set((state) => ({ scores: { ...state.scores, [key]: normalized } }));
+          await useNotificationStore.getState().notifyScoreSubmitted(normalized, findScoreEvent(eventId), 'submitted');
           return normalized;
         } catch (error) {
           console.error('Error submitting score:', error.message);
           set({ error: error.message });
+          await useNotificationStore.getState().notifyScoreSubmitted(nextScore, findScoreEvent(eventId), 'submitted');
           return nextScore;
         }
       },
@@ -172,6 +183,7 @@ const useScoreStore = create(
         }));
 
         if (!isSupabaseConfigured) {
+          await useNotificationStore.getState().notifyScoreSubmitted(nextScore, findScoreEvent(eventId), 'updated');
           return true;
         }
 
@@ -192,6 +204,7 @@ const useScoreStore = create(
 
           const { error } = await supabase.from('scores').upsert([payload]);
           if (error) throw error;
+          await useNotificationStore.getState().notifyScoreSubmitted(nextScore, findScoreEvent(eventId), 'updated');
         } catch (error) {
           console.error('Error updating score:', error.message);
           set({ error: error.message });

@@ -131,6 +131,24 @@ create table if not exists public.certificates (
   issued_at timestamptz default timezone('utc', now())
 );
 
+create table if not exists public.notifications (
+  id text primary key,
+  title text not null,
+  message text not null,
+  type text default 'info',
+  category text default 'system',
+  target_roles text[] default '{}',
+  target_user_ids text[] default '{}',
+  target_emails text[] default '{}',
+  source_key text,
+  entity_type text,
+  entity_id text,
+  action_url text,
+  is_read boolean default false,
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default timezone('utc', now())
+);
+
 create table if not exists public.tournaments (
   id bigint primary key,
   event_id bigint references public.events(id) on delete cascade,
@@ -456,6 +474,7 @@ alter table public.judges enable row level security;
 alter table public.judge_assignments enable row level security;
 alter table public.attendance enable row level security;
 alter table public.certificates enable row level security;
+alter table public.notifications enable row level security;
 alter table public.tournaments enable row level security;
 alter table public.event_categories enable row level security;
 alter table public.event_locations enable row level security;
@@ -516,6 +535,13 @@ with check (true);
 drop policy if exists "Allow anon full access to scores" on public.scores;
 create policy "Allow anon full access to scores"
 on public.scores for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists "Allow anon full access to notifications" on public.notifications;
+create policy "Allow anon full access to notifications"
+on public.notifications for all
 to anon, authenticated
 using (true)
 with check (true);

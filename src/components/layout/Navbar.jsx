@@ -27,7 +27,7 @@ const ROLE_LABELS = {
 export default function Navbar({ isMobile = false, onMenuToggle }) {
   const navigate = useNavigate();
   const { user, userRole } = useAuthStore();
-  const { notifications, markAsRead } = useNotificationStore();
+  const { loadNotifications, subscribeToNotifications, getNotificationsForUser, markAsRead, markAllAsRead } = useNotificationStore();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
 
@@ -64,6 +64,13 @@ export default function Navbar({ isMobile = false, onMenuToggle }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!user) return undefined;
+    loadNotifications(user);
+    return subscribeToNotifications(user);
+  }, [loadNotifications, subscribeToNotifications, user]);
+
+  const notifications = getNotificationsForUser(user);
   const unreadCount = notifications.filter((notification) => !notification.read).length;
   const avatarLetter = String(user?.avatar || user?.name || 'U').charAt(0).toUpperCase();
 
@@ -151,15 +158,37 @@ export default function Navbar({ isMobile = false, onMenuToggle }) {
           {showNotif && (
             <motion.div initial={{ opacity: 0, y: -8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.16 }} style={{ position: 'absolute', top: 52, right: 0, width: 320, maxHeight: 400, overflowY: 'auto', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 16, boxShadow: '0 20px 60px rgba(59,130,246,0.15)', zIndex: 1200 }}>
               <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0' }}>
-                <p style={{ fontWeight: 700, fontSize: 14, margin: 0, color: '#1d4ed8' }}>Notifications</p>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                  <p style={{ fontWeight: 700, fontSize: 14, margin: 0, color: '#1d4ed8' }}>Notifications</p>
+                  {unreadCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => markAllAsRead(user)}
+                      style={{ border: 'none', background: 'transparent', color: '#2563eb', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                </div>
               </div>
               {notifications.length === 0 ? (
-                <div style={{ padding: 24, textAlign: 'center', color: '#60a5fa', fontSize: 13 }}>No notifications yet</div>
+                <div style={{ padding: 24, textAlign: 'center', color: '#64748b', fontSize: 13 }}>No notifications yet</div>
               ) : (
-                notifications.slice(0, 5).map((notification) => (
-                  <div key={notification.id} onClick={() => markAsRead(notification.id)} style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', background: notification.read ? 'transparent' : 'rgba(37,99,235,0.05)', cursor: 'pointer' }}>
-                    <p style={{ fontSize: 13, color: notification.read ? '#60a5fa' : '#1d4ed8', margin: 0 }}>{notification.message}</p>
-                    <p style={{ fontSize: 11, color: '#93c5fd', marginTop: 4, marginBottom: 0 }}>{new Date(notification.time).toLocaleDateString()}</p>
+                notifications.slice(0, 8).map((notification) => (
+                  <div
+                    key={notification.id}
+                    onClick={() => {
+                      markAsRead(notification.id);
+                      if (notification.actionUrl) {
+                        setShowNotif(false);
+                        navigate(notification.actionUrl);
+                      }
+                    }}
+                    style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', background: notification.read ? 'transparent' : 'rgba(37,99,235,0.06)', cursor: 'pointer' }}
+                  >
+                    <p style={{ fontSize: 12, color: notification.read ? '#64748b' : '#1d4ed8', margin: '0 0 4px', fontWeight: 800 }}>{notification.title || 'Notification'}</p>
+                    <p style={{ fontSize: 13, color: '#0f172a', margin: 0, lineHeight: 1.35 }}>{notification.message}</p>
+                    <p style={{ fontSize: 11, color: '#64748b', marginTop: 6, marginBottom: 0 }}>{new Date(notification.time).toLocaleString()}</p>
                   </div>
                 ))
               )}
