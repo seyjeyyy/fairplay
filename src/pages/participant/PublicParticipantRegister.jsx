@@ -615,18 +615,9 @@ export default function PublicParticipantRegister() {
                   <label style={labelStyle}>Full Name</label>
                   <input value={coach.fullName} onChange={(e) => updatePerson(setCoach, 'fullName', e.target.value)} placeholder="Coach full name" style={{ ...inputStyle, background: '#fff' }} disabled={submitting} />
                 </div>
-                <div style={responsiveTwoColumnGrid}>
-                  <div>
-                    <label style={labelStyle}>Age <Opt /></label>
-                    <input type="number" min="1" value={coach.age} onChange={(e) => updatePerson(setCoach, 'age', e.target.value)} style={{ ...inputStyle, background: '#fff' }} disabled={submitting} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>School Year <Opt /></label>
-                    <select value={coach.schoolYear} onChange={(e) => updatePerson(setCoach, 'schoolYear', e.target.value)} style={{ ...inputStyle, background: '#fff' }} disabled={submitting}>
-                      <option value="">Select school year</option>
-                      {SCHOOL_YEAR_OPTIONS.map((year) => <option key={year} value={year}>{year}</option>)}
-                    </select>
-                  </div>
+                <div>
+                  <label style={labelStyle}>Age <Opt /></label>
+                  <input type="number" min="1" value={coach.age} onChange={(e) => updatePerson(setCoach, 'age', e.target.value)} style={{ ...inputStyle, background: '#fff' }} disabled={submitting} />
                 </div>
                 <div>
                   <label style={labelStyle}>Phone Number <Opt /></label>
