@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 export default function Register() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '', role: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '', role: 'organizer' });
   const [error, setError] = useState('');
 
   const handleSubmit = (e) => {
@@ -121,20 +121,15 @@ export default function Register() {
             </div>
             <div>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#a0aec0', marginBottom: 6 }}>Role</label>
-              <select
-                value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value })}
+              <div
                 style={{
                   width: '100%', padding: '10px 14px', borderRadius: 10,
                   background: 'rgba(26,31,46,0.8)', border: '1px solid rgba(255,255,255,0.08)',
                   color: '#fff', fontSize: 14, outline: 'none',
                 }}
               >
-                <option value="">Select a role</option>
-                <option value="organizer">Event Organizer</option>
-                <option value="judge">Judge</option>
-                <option value="participant">Participant</option>
-              </select>
+                Event Organizer only - pending admin approval
+              </div>
             </div>
           </div>
 

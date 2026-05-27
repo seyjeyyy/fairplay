@@ -101,6 +101,10 @@ function ProtectedRoute({ children, role, roles }) {
     return <Navigate to={buildAuthModalPath('login', buildReturnToPath(location))} replace />;
   }
 
+  if (user.role === 'organizer' && user.status !== 'active') {
+    return <Navigate to="/?modal=login" replace />;
+  }
+
   const allowedRoles = roles || (role ? [role] : []);
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
     return <Navigate to={roleHomePath(user.role)} replace />;
@@ -119,6 +123,10 @@ function DashboardRedirect() {
 
   if (!user || !token) {
     return <Navigate to={buildAuthModalPath('login', buildReturnToPath(location))} replace />;
+  }
+
+  if (user.role === 'organizer' && user.status !== 'active') {
+    return <Navigate to="/?modal=login" replace />;
   }
 
   return <Navigate to={roleHomePath(user.role)} replace />;

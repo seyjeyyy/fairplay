@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Lock, Trash2, UserPlus, Search, RefreshCw, X } from 'lucide-react';
+import { CheckCircle2, Lock, Trash2, UserPlus, Search, RefreshCw, X } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import useAuthStore from '../../store/authStore';
 import useEventStore from '../../store/eventStore';
@@ -119,6 +119,12 @@ export default function AdminUsers() {
     setBusy('');
   }
 
+  async function handleApproveOrganizer(user) {
+    setBusy(`approve-${user.id}`);
+    await updateUser(user.id, { status: 'active', role: 'organizer' });
+    setBusy('');
+  }
+
   async function handleDelete(user) {
     if (!window.confirm(`Delete ${user.email}?`)) return;
     setBusy(`delete-${user.id}`);
@@ -180,6 +186,11 @@ export default function AdminUsers() {
                       <button onClick={() => handleToggleStatus(user)} disabled={Boolean(busy)} style={iconButtonStyle} aria-label="Toggle user status">
                         <Lock size={14} />
                       </button>
+                      {user.role === 'organizer' && user.status === 'pending' && (
+                        <button onClick={() => handleApproveOrganizer(user)} disabled={Boolean(busy)} style={{ ...iconButtonStyle, background: 'rgba(34,197,94,0.10)', borderColor: 'rgba(34,197,94,0.24)', color: '#16a34a' }} aria-label="Approve organizer signup" title="Approve organizer">
+                          <CheckCircle2 size={14} />
+                        </button>
+                      )}
                       <button onClick={() => handleDelete(user)} disabled={Boolean(busy)} style={{ ...iconButtonStyle, background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.2)', color: '#ef4444' }} aria-label="Delete user">
                         <Trash2 size={14} />
                       </button>
@@ -304,5 +315,8 @@ function rolePill(role = 'participant') {
 }
 
 function statusPill(status = 'active') {
+  if (status === 'pending') {
+    return { padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: 'rgba(245,158,11,0.14)', color: '#b45309' };
+  }
   return { padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: status === 'active' ? 'rgba(37,99,235,0.12)' : 'rgba(239,68,68,0.12)', color: status === 'active' ? '#1d4ed8' : '#ef4444' };
 }

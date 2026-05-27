@@ -47,6 +47,10 @@ function getSeedUser(email, password) {
   return safeUser;
 }
 
+function isPendingOrganizer(user) {
+  return user?.role === 'organizer' && user?.status !== 'active';
+}
+
 function mapProfileRow(profile) {
   if (!profile) return null;
   return {
@@ -87,7 +91,7 @@ async function upsertProfileFromAuth(authUser, overrides = {}) {
     full_name: overrides.full_name || metadata.full_name || metadata.name || authUser.email || 'FairPlay User',
     role: normalizeRole(overrides.role || metadata.role),
     avatar_url: overrides.avatar_url || metadata.avatar_url || '',
-    status: overrides.status || 'active',
+    status: overrides.status || metadata.status || 'active',
     updated_at: new Date().toISOString(),
   };
 
@@ -216,10 +220,18 @@ const useAuthStore = create(
         const normalizedEmail = String(email || '').trim().toLowerCase();
 
         if (!SUPABASE_AUTH_ENABLED || !supabase) {
-          const safeUser = getSeedUser(normalizedEmail, password);
+          const safeUser = getSeedUser(normalizedEmail, password) || get().users.find((entry) =>
+            String(entry.email || '').toLowerCase() === normalizedEmail &&
+            entry.password === password
+          );
           if (!safeUser) {
             set({ loading: false });
             return { success: false, error: 'Invalid email or password.' };
+          }
+
+          if (isPendingOrganizer(safeUser)) {
+            set({ loading: false, initialized: true });
+            return { success: false, error: 'Your organizer account is pending admin approval.' };
           }
 
           const token = `token_${safeUser.id}_${Date.now()}`;
@@ -238,6 +250,11 @@ const useAuthStore = create(
           }
 
           const sessionUser = await buildSessionUser(data.user);
+          if (isPendingOrganizer(sessionUser)) {
+            await supabase.auth.signOut().catch(() => {});
+            set({ user: null, token: null, loading: false, initialized: true });
+            return { success: false, error: 'Your organizer account is pending admin approval.' };
+          }
           const users = await fetchProfilesList().catch(() => get().users);
 
           set({
@@ -280,8 +297,9 @@ const useAuthStore = create(
 
         const email = String(userData?.email || '').trim().toLowerCase();
         const password = String(userData?.password || '');
-        const role = normalizeRole(userData?.role);
+        const role = 'organizer';
         const name = String(userData?.name || '').trim() || email || 'FairPlay User';
+        const status = 'pending';
 
         if (!SUPABASE_AUTH_ENABLED || !supabase) {
           const newUser = {
@@ -289,21 +307,26 @@ const useAuthStore = create(
             email,
             name,
             role,
+            password,
             avatar: buildAvatar(name, email),
-            status: 'active',
+            status,
             joined: new Date().toISOString().slice(0, 10),
           };
-          const token = `token_${newUser.id}_${Date.now()}`;
           set((state) => ({
-            user: newUser,
-            token,
+            user: null,
+            token: null,
             users: [newUser, ...state.users.filter((entry) => entry.email !== newUser.email)],
             loading: false,
             initialized: true,
             authMode: 'demo',
             sessionSource: 'demo',
           }));
-          return { success: true, user: newUser };
+          return {
+            success: true,
+            user: newUser,
+            requiresApproval: true,
+            message: 'Organizer account submitted. Please wait for admin approval before signing in.',
+          };
         }
 
         try {
@@ -314,6 +337,7 @@ const useAuthStore = create(
               data: {
                 full_name: name,
                 role,
+                status,
               },
             },
           });
@@ -326,15 +350,15 @@ const useAuthStore = create(
           let sessionUser = null;
 
           if (authUser) {
-            const profile = await upsertProfileFromAuth(authUser, { full_name: name, role });
+            const profile = await upsertProfileFromAuth(authUser, { full_name: name, role, status });
             sessionUser = mapProfileRow(profile);
           }
 
           const users = await fetchProfilesList().catch(() => get().users);
 
           set({
-            user: data.session ? sessionUser : null,
-            token: data.session?.access_token || null,
+            user: null,
+            token: null,
             users,
             loading: false,
             initialized: true,
@@ -342,13 +366,18 @@ const useAuthStore = create(
             sessionSource: 'supabase',
           });
 
+          if (data.session) {
+            await supabase.auth.signOut().catch(() => {});
+          }
+
           return {
             success: true,
             user: sessionUser,
+            requiresApproval: true,
             requiresEmailConfirmation: !data.session,
-            message: data.session
-              ? 'Account created successfully.'
-              : 'Account created. Check your email to confirm your account before signing in.',
+            message: !data.session
+              ? 'Account created. Check your email if required, then wait for admin approval.'
+              : 'Organizer account submitted. Please wait for admin approval before signing in.',
           };
         } catch (error) {
           set({ loading: false, initialized: true });

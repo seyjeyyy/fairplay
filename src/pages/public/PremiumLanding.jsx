@@ -13,7 +13,7 @@ const AuthModal = ({ mode: initialMode, onClose }) => {
 
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [regData, setRegData] = useState({
-    name: '', email: '', password: '', confirmPassword: '', role: 'participant'
+    name: '', email: '', password: '', confirmPassword: '', role: 'organizer'
   });
 
   // Close on ESC
@@ -32,11 +32,11 @@ const AuthModal = ({ mode: initialMode, onClose }) => {
     navigate(paths[user?.role] || '/dashboard', { replace: true });
   };
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
     if (!loginData.email || !loginData.password) { setError('Please fill in all fields.'); return; }
-    const result = store.login(loginData.email, loginData.password);
+    const result = await store.login(loginData.email, loginData.password);
     if (result.success) {
       onClose();
       redirectAfterLogin(result.user);
@@ -45,16 +45,16 @@ const AuthModal = ({ mode: initialMode, onClose }) => {
     }
   };
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
     if (!regData.name || !regData.email || !regData.password) { setError('Please fill in all fields.'); return; }
     if (regData.password.length < 6) { setError('Password must be at least 6 characters.'); return; }
     if (regData.password !== regData.confirmPassword) { setError('Passwords do not match.'); return; }
-    const result = store.register({ name: regData.name, email: regData.email, password: regData.password, role: regData.role });
+    const result = await store.register({ name: regData.name, email: regData.email, password: regData.password, role: 'organizer' });
     if (result.success) {
-      onClose();
-      redirectAfterLogin(result.user);
+      setMode('login');
+      setError(result.message || 'Organizer account submitted. Please wait for admin approval before signing in.');
     } else {
       setError(result.error || 'Registration failed.');
     }
@@ -67,10 +67,10 @@ const AuthModal = ({ mode: initialMode, onClose }) => {
     { label: 'Participant', email: 'participant@fairplay.com', password: 'part123', color: '#f59e0b' },
   ];
 
-  const quickLogin = (acc) => {
+  const quickLogin = async (acc) => {
     setError('');
     setLoginData({ email: acc.email, password: acc.password });
-    const result = store.login(acc.email, acc.password);
+    const result = await store.login(acc.email, acc.password);
     if (result.success) {
       onClose();
       redirectAfterLogin(result.user);
@@ -138,11 +138,9 @@ const AuthModal = ({ mode: initialMode, onClose }) => {
               </div>
               <div className="fp-field">
                 <label>Role</label>
-                <select value={regData.role} onChange={e => setRegData(p => ({ ...p, role: e.target.value }))}>
-                  <option value="participant">Participant</option>
-                  <option value="organizer">Organizer</option>
-                  <option value="judge">Judge</option>
-                </select>
+                <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.18)', color: '#bae6fd', fontWeight: 700 }}>
+                  Organizer only, pending admin approval
+                </div>
               </div>
             </div>
             <div className="fp-field">

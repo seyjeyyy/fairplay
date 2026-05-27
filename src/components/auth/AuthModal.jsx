@@ -34,7 +34,7 @@ export default function AuthModal({ onClose }) {
   const returnTo = searchParams.get('returnTo');
 
   const [loginData, setLoginData] = useState({ email: '', password: '' });
-  const [regData, setRegData] = useState({ name: '', email: '', password: '', confirmPassword: '', role: 'participant' });
+  const [regData, setRegData] = useState({ name: '', email: '', password: '', confirmPassword: '', role: 'organizer' });
 
   useEffect(() => {
     const onKey = (event) => {
@@ -117,8 +117,14 @@ export default function AuthModal({ onClose }) {
     if (password !== confirmPassword) return setError('Passwords do not match.');
     if (!acceptedTerms) return setError('Please agree to the terms to continue.');
 
-    const result = await store.register({ name, email, password, role: regData.role });
+    const result = await store.register({ name, email, password, role: 'organizer' });
     if (result.success) {
+      if (result.requiresApproval) {
+        setMode('login');
+        setNotice(result.message || 'Organizer account submitted. Please wait for admin approval before signing in.');
+        setLoginData({ email, password: '' });
+        return;
+      }
       if (result.requiresEmailConfirmation) {
         setMode('login');
         setNotice(result.message || 'Account created. Please confirm your email before signing in.');
@@ -206,10 +212,10 @@ export default function AuthModal({ onClose }) {
             {authModeLabel}
           </div>
           <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8, color: '#f8fafc' }}>
-            {mode === 'login' ? 'Welcome Back' : 'Create Account'}
+            {mode === 'login' ? 'Welcome Back' : 'Create Organizer Account'}
           </h2>
           <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 24 }}>
-            {mode === 'login' ? 'Access your FairPlay workspace and continue your workflow.' : 'Set up your account and launch your next event faster.'}
+            {mode === 'login' ? 'Access your FairPlay workspace and continue your workflow.' : 'Register as an organizer. Admin approval is required before dashboard access.'}
           </p>
 
           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 4, marginBottom: 24 }}>
@@ -318,17 +324,13 @@ export default function AuthModal({ onClose }) {
 
           {mode === 'register' && (
             <form onSubmit={handleRegister}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+              <div style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
                 <Field label="Full Name" noMargin>
                   <input type="text" value={regData.name} onChange={(event) => setRegData((current) => ({ ...current, name: event.target.value }))} autoFocus style={inputStyle} />
                 </Field>
-                <Field label="Role" noMargin>
-                  <select value={regData.role} onChange={(event) => setRegData((current) => ({ ...current, role: event.target.value }))} style={inputStyle}>
-                    <option value="participant">Participant</option>
-                    <option value="organizer">Organizer</option>
-                    <option value="judge">Judge</option>
-                  </select>
-                </Field>
+                <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.18)', color: '#bae6fd', fontSize: 13, fontWeight: 700 }}>
+                  Role: Organizer only. Your account will stay pending until an admin approves it.
+                </div>
               </div>
 
               <Field label="Email">
