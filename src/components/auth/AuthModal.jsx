@@ -120,9 +120,9 @@ export default function AuthModal({ onClose }) {
     const result = await store.register({ name, email, password, role: 'organizer' });
     if (result.success) {
       if (result.requiresApproval) {
-        setMode('login');
         setNotice(result.message || 'Organizer account submitted. Please wait for admin approval before signing in.');
-        setLoginData({ email, password: '' });
+        setRegData({ name: '', email: '', password: '', confirmPassword: '', role: 'organizer' });
+        setAcceptedTerms(false);
         return;
       }
       if (result.requiresEmailConfirmation) {
@@ -165,9 +165,10 @@ export default function AuthModal({ onClose }) {
         backdropFilter: 'blur(10px)',
         zIndex: 9999,
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'center',
-        padding: 20,
+        padding: '16px 20px',
+        overflowY: 'auto',
       }}
     >
       <div style={{
@@ -176,8 +177,10 @@ export default function AuthModal({ onClose }) {
         borderRadius: 28,
         width: '100%',
         maxWidth: 540,
+        maxHeight: 'calc(100vh - 32px)',
         boxShadow: '0 30px 120px rgba(0,0,0,0.56)',
-        overflow: 'hidden',
+        overflowY: 'auto',
+        overflowX: 'hidden',
         position: 'relative',
       }}>
         <button
@@ -203,22 +206,22 @@ export default function AuthModal({ onClose }) {
           <i className="bi bi-x-lg" />
         </button>
 
-        <div style={{ padding: '32px 32px 0', textAlign: 'center' }}>
-          <div style={{ width: 56, height: 56, margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ padding: '24px 32px 0', textAlign: 'center' }}>
+          <div style={{ width: 48, height: 48, margin: '0 auto 12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <img src="/icon.svg" alt="FairPlay" style={{ width: '100%', height: '100%', filter: 'drop-shadow(0 0 15px rgba(6, 182, 212, 0.5))' }} />
           </div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 999, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.18)', color: '#67e8f9', fontSize: 12, fontWeight: 700, marginBottom: 14 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 999, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.18)', color: '#67e8f9', fontSize: 12, fontWeight: 700, marginBottom: 10 }}>
             <i className={authMode === 'supabase' ? 'bi bi-shield-lock' : authMode === 'hybrid' ? 'bi bi-layers' : 'bi bi-display'} />
             {authModeLabel}
           </div>
-          <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8, color: '#f8fafc' }}>
+          <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 6, color: '#f8fafc' }}>
             {mode === 'login' ? 'Welcome Back' : 'Create Organizer Account'}
           </h2>
-          <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 24 }}>
+          <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 18 }}>
             {mode === 'login' ? 'Access your FairPlay workspace and continue your workflow.' : 'Register as an organizer. Admin approval is required before dashboard access.'}
           </p>
 
-          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 4, marginBottom: 24 }}>
+          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 4, marginBottom: 18 }}>
             <button
               onClick={() => { setMode('login'); setError(''); setNotice(''); }}
               style={{
@@ -252,7 +255,7 @@ export default function AuthModal({ onClose }) {
           </div>
         </div>
 
-        <div style={{ padding: '0 32px 32px' }}>
+        <div style={{ padding: '0 32px 24px' }}>
           {error && (
             <div style={{ padding: 12, borderRadius: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#fca5a5', fontSize: 13, marginBottom: 20, textAlign: 'center' }}>
               {error}

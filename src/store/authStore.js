@@ -118,6 +118,8 @@ function mapProfileRow(profile) {
     avatarUrl: profile.avatar_url || '',
     status: profile.status || 'active',
     joined: profile.created_at ? String(profile.created_at).slice(0, 10) : new Date().toISOString().slice(0, 10),
+    metadata: profile.metadata || {},
+    password: profile.metadata?.pendingPassword,
   };
 }
 
@@ -204,6 +206,59 @@ async function fetchProfilesList() {
   }
 
   return data.map(mapProfileRow);
+}
+
+function createPendingProfileId() {
+  const random = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `pending-${random}`;
+}
+
+async function createPendingOrganizerProfile({ email, name, password }) {
+  const now = new Date().toISOString();
+  const existing = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (existing.error) {
+    throw existing.error;
+  }
+
+  if (existing.data?.status === 'active') {
+    throw new Error('This email already has an active account.');
+  }
+
+  const payload = {
+    id: existing.data?.id || createPendingProfileId(),
+    email,
+    full_name: name,
+    role: 'organizer',
+    avatar_url: existing.data?.avatar_url || '',
+    status: 'pending',
+    metadata: {
+      ...(existing.data?.metadata || {}),
+      source: 'organizer-signup',
+      pendingPassword: password,
+      requestedAt: now,
+    },
+    created_at: existing.data?.created_at || now,
+    updated_at: now,
+  };
+
+  const query = existing.data
+    ? supabase.from('profiles').update(payload).eq('id', existing.data.id)
+    : supabase.from('profiles').insert(payload);
+
+  const { data, error } = await query.select().single();
+
+  if (error) {
+    throw error;
+  }
+
+  return mapProfileRow(data);
 }
 
 const useAuthStore = create(
@@ -401,32 +456,8 @@ const useAuthStore = create(
         }
 
         try {
-          const { data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              emailRedirectTo: getAuthRedirectUrl(),
-              data: {
-                full_name: name,
-                role,
-                status,
-              },
-            },
-          });
-
-          if (error) {
-            throw error;
-          }
-
-          const authUser = data.user;
-          let sessionUser = null;
-          let organizerApplication = null;
-
-          if (authUser) {
-            const profile = await upsertProfileFromAuth(authUser, { full_name: name, role, status });
-            sessionUser = mapProfileRow(profile);
-            organizerApplication = buildOrganizerApplication({ ...sessionUser, source: 'supabase-signup' });
-          }
+          const pendingOrganizer = await createPendingOrganizerProfile({ email, name, password });
+          const organizerApplication = buildOrganizerApplication({ ...pendingOrganizer, password, source: 'organizer-signup' });
 
           const users = await fetchProfilesList().catch(() => get().users);
 
@@ -434,34 +465,30 @@ const useAuthStore = create(
             user: null,
             token: null,
             users,
-            organizerApplications: organizerApplication
-              ? [
-                  organizerApplication,
-                  ...state.organizerApplications.filter((entry) => entry.email !== organizerApplication.email),
-                ]
-              : state.organizerApplications,
+            organizerApplications: [
+              organizerApplication,
+              ...buildOrganizerApplicationsFromUsers(users).filter((entry) => entry.email !== organizerApplication.email),
+              ...state.organizerApplications.filter((entry) => entry.email !== organizerApplication.email),
+            ],
             loading: false,
             initialized: true,
             authMode: 'supabase',
             sessionSource: 'supabase',
           }));
 
-          if (data.session) {
-            await supabase.auth.signOut().catch(() => {});
-          }
-
           return {
             success: true,
-            user: sessionUser,
+            user: pendingOrganizer,
             requiresApproval: true,
-            requiresEmailConfirmation: !data.session,
-            message: !data.session
-              ? 'Account created. Check your email if required, then wait for admin approval.'
-              : 'Organizer account submitted. Please wait for admin approval before signing in.',
+            requiresEmailConfirmation: false,
+            message: 'Organizer request submitted. Admin approval is required before signing in.',
           };
         } catch (error) {
           set({ loading: false, initialized: true });
-          return { success: false, error: error?.message || 'Unable to create your account right now.' };
+          return {
+            success: false,
+            error: error?.message || 'Unable to submit organizer request right now.',
+          };
         }
       },
 

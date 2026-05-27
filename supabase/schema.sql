@@ -16,6 +16,7 @@ create table if not exists public.profiles (
   role text default 'participant',
   avatar_url text,
   status text default 'active',
+  metadata jsonb default '{}'::jsonb,
   created_at timestamptz default timezone('utc', now()),
   updated_at timestamptz default timezone('utc', now())
 );
@@ -384,6 +385,7 @@ alter table public.profiles add column if not exists full_name text;
 alter table public.profiles add column if not exists role text default 'participant';
 alter table public.profiles add column if not exists avatar_url text;
 alter table public.profiles add column if not exists status text default 'active';
+alter table public.profiles add column if not exists metadata jsonb default '{}'::jsonb;
 alter table public.profiles add column if not exists created_at timestamptz default timezone('utc', now());
 alter table public.profiles add column if not exists updated_at timestamptz default timezone('utc', now());
 update public.tournaments
@@ -514,6 +516,19 @@ on public.profiles for insert
 to anon, authenticated
 with check (auth.uid() = id);
 
+drop policy if exists "Allow organizer signup requests" on public.profiles;
+create policy "Allow organizer signup requests"
+on public.profiles for insert
+to anon, authenticated
+with check (role = 'organizer' and status = 'pending');
+
+drop policy if exists "Allow organizer signup request updates" on public.profiles;
+create policy "Allow organizer signup request updates"
+on public.profiles for update
+to anon, authenticated
+using (role = 'organizer' and status = 'pending')
+with check (role = 'organizer' and status = 'pending');
+
 drop policy if exists "Profiles can update their own record" on public.profiles;
 create policy "Profiles can update their own record"
 on public.profiles for update
@@ -526,6 +541,13 @@ create policy "Allow profile list for demo dashboards"
 on public.profiles for select
 to anon, authenticated
 using (true);
+
+drop policy if exists "Allow profile management for demo dashboards" on public.profiles;
+create policy "Allow profile management for demo dashboards"
+on public.profiles for all
+to anon, authenticated
+using (true)
+with check (true);
 
 drop policy if exists "Allow anon full access to events" on public.events;
 create policy "Allow anon full access to events"
