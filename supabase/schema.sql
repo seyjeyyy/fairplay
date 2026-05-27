@@ -242,6 +242,22 @@ create table if not exists public.judge_status_logs (
   updated_at timestamptz default timezone('utc', now())
 );
 
+create table if not exists public.ai_detections (
+  id text primary key,
+  target_type text not null default 'system',
+  target_id text,
+  target_name text,
+  actor_id text,
+  actor_name text,
+  risk_level text not null default 'low',
+  status text not null default 'open',
+  reason text not null,
+  metadata jsonb default '{}'::jsonb,
+  detected_at timestamptz default timezone('utc', now()),
+  created_at timestamptz default timezone('utc', now()),
+  updated_at timestamptz default timezone('utc', now())
+);
+
 alter table public.events add column if not exists description text;
 alter table public.events add column if not exists metadata jsonb default '{}'::jsonb;
 
@@ -448,6 +464,7 @@ alter table public.brackets enable row level security;
 alter table public.matches enable row level security;
 alter table public.match_participants enable row level security;
 alter table public.judge_status_logs enable row level security;
+alter table public.ai_detections enable row level security;
 
 drop policy if exists "Profiles can read their own record" on public.profiles;
 create policy "Profiles can read their own record"
@@ -592,3 +609,29 @@ on public.judge_status_logs for all
 to anon, authenticated
 using (true)
 with check (true);
+
+drop trigger if exists set_ai_detections_updated_at on public.ai_detections;
+create trigger set_ai_detections_updated_at
+before update on public.ai_detections
+for each row execute function public.set_updated_at();
+
+drop policy if exists "Allow anon full access to ai_detections" on public.ai_detections;
+create or replace function public.is_admin_user()
+returns boolean
+language sql
+stable
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where profiles.id = auth.uid()::text
+      and profiles.role = 'admin'
+  );
+$$;
+
+drop policy if exists "Admins can manage ai_detections" on public.ai_detections;
+create policy "Admins can manage ai_detections"
+on public.ai_detections for all
+to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());

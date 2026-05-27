@@ -29,7 +29,6 @@ const NAV_GROUPS = {
         icon: 'bi bi-sliders',
         items: [
           { label: 'System Analytics', path: '/admin/analytics', icon: 'bi bi-graph-up' },
-          { label: 'Subscription and Billing', path: '/admin/subscriptions', icon: 'bi bi-credit-card' },
           { label: 'Audit Logs', path: '/admin/audit', icon: 'bi bi-journal-text' },
           { label: 'Platform Settings', path: '/admin/settings', icon: 'bi bi-gear' },
           { label: 'Backup and Restore', path: '/admin/backup', icon: 'bi bi-database' },

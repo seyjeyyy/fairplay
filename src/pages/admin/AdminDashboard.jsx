@@ -20,6 +20,7 @@ import {
   Activity,
 } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import PaginationControls from '../../components/admin/PaginationControls';
 import useAttendanceStore from '../../store/attendanceStore';
 import useAuthStore from '../../store/authStore';
 import useEventStore from '../../store/eventStore';
@@ -84,6 +85,8 @@ export default function AdminDashboard() {
   const { attendance, fetchAttendance } = useAttendanceStore();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+  const [eventPage, setEventPage] = useState(1);
+  const [eventLimit, setEventLimit] = useState(10);
 
   useEffect(() => {
     fetchEvents();
@@ -172,6 +175,20 @@ export default function AdminDashboard() {
       return haystack.includes(search.toLowerCase());
     })
   ), [events, filter, search]);
+  const totalEventPages = Math.max(1, Math.ceil(filteredEvents.length / eventLimit));
+  const paginatedEvents = useMemo(() => {
+    const safePage = Math.min(eventPage, totalEventPages);
+    const start = (safePage - 1) * eventLimit;
+    return filteredEvents.slice(start, start + eventLimit);
+  }, [eventLimit, eventPage, filteredEvents, totalEventPages]);
+
+  useEffect(() => {
+    setEventPage(1);
+  }, [eventLimit, filter, search]);
+
+  useEffect(() => {
+    if (eventPage > totalEventPages) setEventPage(totalEventPages);
+  }, [eventPage, totalEventPages]);
 
   const cardStyle = {
     background: '#ffffff',
@@ -306,7 +323,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredEvents.map((event, i) => {
+                  {paginatedEvents.map((event, i) => {
                     const eventScores = scoreRows.filter((score) => String(score.eventId) === String(event.id));
                     const eventRegistrations = registrations.filter((registration) => String(registration.eventId) === String(event.id));
                     const eventAttendance = attendance.filter((row) => String(row.eventId) === String(event.id));
@@ -358,6 +375,14 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+            <PaginationControls
+              page={Math.min(eventPage, totalEventPages)}
+              totalPages={totalEventPages}
+              limit={eventLimit}
+              totalItems={filteredEvents.length}
+              onPageChange={setEventPage}
+              onLimitChange={setEventLimit}
+            />
           </div>
         </div>
       </div>
