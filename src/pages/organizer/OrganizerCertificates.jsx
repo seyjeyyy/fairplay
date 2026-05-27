@@ -12,6 +12,8 @@ import btechLogo from '../../../assets/logo/BTECH.jpg';
 const JUDGE_CATEGORIES = ['judge'];
 const TEMPLATE_UPLOAD_MAX_BYTES = 4 * 1024 * 1024;
 const TEMPLATE_UPLOAD_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'];
+const CERTIFICATE_EXPORT_WIDTH = 900;
+const CERTIFICATE_EXPORT_HEIGHT = 636;
 
 function categoryFromPlacement(placement) {
   if (placement === 1) return 'champion';
@@ -21,20 +23,68 @@ function categoryFromPlacement(placement) {
 }
 
 async function exportCertificateToPDF(element, filename) {
-  const canvas = await html2canvas(element, {
-    scale: 2,
-    useCORS: true,
-    backgroundColor: '#ffffff',
-    logging: false,
+  if (document.fonts?.ready) {
+    await document.fonts.ready.catch(() => {});
+  }
+
+  const exportWrapper = document.createElement('div');
+  const exportNode = element.cloneNode(true);
+
+  Object.assign(exportWrapper.style, {
+    position: 'fixed',
+    left: '-10000px',
+    top: '0',
+    width: `${CERTIFICATE_EXPORT_WIDTH}px`,
+    height: `${CERTIFICATE_EXPORT_HEIGHT}px`,
+    background: '#ffffff',
+    overflow: 'hidden',
+    zIndex: '-1',
+    pointerEvents: 'none',
   });
-  const imgData = canvas.toDataURL('image/png');
-  const pdf = new jsPDF({
-    orientation: 'landscape',
-    unit: 'px',
-    format: [canvas.width / 2, canvas.height / 2],
+
+  Object.assign(exportNode.style, {
+    width: `${CERTIFICATE_EXPORT_WIDTH}px`,
+    height: `${CERTIFICATE_EXPORT_HEIGHT}px`,
+    maxWidth: 'none',
+    maxHeight: 'none',
+    margin: '0',
+    transform: 'none',
+    transformOrigin: 'top left',
   });
-  pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
-  pdf.save(filename);
+
+  exportWrapper.appendChild(exportNode);
+  document.body.appendChild(exportWrapper);
+
+  try {
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+    const canvas = await html2canvas(exportNode, {
+      scale: 3,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      width: CERTIFICATE_EXPORT_WIDTH,
+      height: CERTIFICATE_EXPORT_HEIGHT,
+      windowWidth: CERTIFICATE_EXPORT_WIDTH,
+      windowHeight: CERTIFICATE_EXPORT_HEIGHT,
+      scrollX: 0,
+      scrollY: 0,
+      letterRendering: true,
+    });
+
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'px',
+      format: [CERTIFICATE_EXPORT_WIDTH, CERTIFICATE_EXPORT_HEIGHT],
+    });
+
+    pdf.addImage(imgData, 'PNG', 0, 0, CERTIFICATE_EXPORT_WIDTH, CERTIFICATE_EXPORT_HEIGHT, undefined, 'FAST');
+    pdf.save(filename);
+  } finally {
+    document.body.removeChild(exportWrapper);
+  }
 }
 
 function fileToDataUrl(file) {
