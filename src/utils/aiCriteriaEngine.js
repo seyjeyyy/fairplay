@@ -147,8 +147,86 @@ function toTitleCase(str) {
   return str.replace(/-/g, ' ').replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1));
 }
 
+function rebalanceCriteriaWeights(criteria = []) {
+  const normalized = criteria.map((criterion, index) => ({
+    id: criterion.id || `criterion-${index + 1}`,
+    name: criterion.name || `Criterion ${index + 1}`,
+    weight: Number(criterion.weight || 0),
+    description: criterion.description || '',
+    scoringRange: criterion.scoringRange || '1-10',
+    judgeInstructions: criterion.judgeInstructions || 'Score with consistency and evidence.',
+    editable: true,
+  }));
+
+  if (!normalized.length) return normalized;
+
+  const total = normalized.reduce((sum, criterion) => sum + Number(criterion.weight || 0), 0);
+  if (total === 100) return normalized;
+
+  const base = Math.floor(100 / normalized.length);
+  const remainder = 100 % normalized.length;
+  return normalized.map((criterion, index) => ({
+    ...criterion,
+    weight: base + (index < remainder ? 1 : 0),
+  }));
+}
+
+function ensureMinimumCriteria(criteria = [], minimum = 5) {
+  const fallbackCriteria = [
+    {
+      name: 'Technical Execution',
+      description: 'Accuracy, skill, and quality of the required performance or task.',
+    },
+    {
+      name: 'Creativity and Originality',
+      description: 'Freshness of ideas, uniqueness, and creative approach.',
+    },
+    {
+      name: 'Presentation and Delivery',
+      description: 'Confidence, clarity, stage presence, and overall delivery.',
+    },
+    {
+      name: 'Relevance to Theme',
+      description: 'How well the entry matches the event objective, category, or theme.',
+    },
+    {
+      name: 'Overall Impact',
+      description: 'Total impression, audience effect, and competitive quality.',
+    },
+  ];
+
+  const nextCriteria = criteria.map((criterion, index) => ({
+    ...criterion,
+    id: criterion.id || `criterion-${index + 1}`,
+    name: criterion.name || `Criterion ${index + 1}`,
+  }));
+  const existingNames = new Set(nextCriteria.map((criterion) => String(criterion.name || '').toLowerCase()));
+
+  let fallbackIndex = 0;
+  while (nextCriteria.length < minimum) {
+    const baseFallback = fallbackCriteria[fallbackIndex % fallbackCriteria.length];
+    const fallbackName = existingNames.has(baseFallback.name.toLowerCase())
+      ? `Additional ${baseFallback.name}`
+      : baseFallback.name;
+
+    nextCriteria.push({
+      id: `criterion-${Date.now()}-${nextCriteria.length + 1}`,
+      name: fallbackName,
+      weight: 0,
+      description: baseFallback.description,
+      scoringRange: '1-10',
+      judgeInstructions: `Evaluate ${fallbackName.toLowerCase()} based on observable performance. Score objectively from 1-10.`,
+      editable: true,
+    });
+    existingNames.add(fallbackName.toLowerCase());
+    fallbackIndex += 1;
+  }
+
+  return rebalanceCriteriaWeights(nextCriteria);
+}
+
 function createProfileVariants(base) {
-  const baseCriteria = base.criteria;
+  const baseCriteria = ensureMinimumCriteria(base.criteria, 5);
 
   const balanced = {
     profile: `${base.profile} - Balanced`,
@@ -236,8 +314,16 @@ export function parseUploadedCriteriaTemplate(uploadedCriteria = '') {
 
   try {
     const parsed = JSON.parse(input);
-    if (Array.isArray(parsed)) {
-      return parsed.map((criterion, index) => ({
+    const parsedCriteria = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray(parsed?.criteria)
+        ? parsed.criteria
+        : Array.isArray(parsed?.profiles?.[0]?.criteria)
+          ? parsed.profiles[0].criteria
+          : [];
+
+    if (parsedCriteria.length > 0) {
+      return parsedCriteria.map((criterion, index) => ({
         id: criterion.id || `uploaded-${index + 1}`,
         name: criterion.name || `Criterion ${index + 1}`,
         weight: Number(criterion.weight || 0),
@@ -252,7 +338,8 @@ export function parseUploadedCriteriaTemplate(uploadedCriteria = '') {
 
   const lines = input.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   return lines.map((line, index) => {
-    const parts = line.split('|').map((part) => part.trim());
+    const delimiter = line.includes('|') ? '|' : ',';
+    const parts = line.split(delimiter).map((part) => part.trim());
     return {
       id: `uploaded-${index + 1}`,
       name: parts[0] || `Criterion ${index + 1}`,
@@ -274,7 +361,7 @@ export function generateCriteriaFromUpload(uploadedCriteria = '', params = {}) {
   const baseProfile = parsedTemplate.length > 0
     ? {
         profile: 'Template Guided Assessment',
-        criteria: parsedTemplate,
+        criteria: ensureMinimumCriteria(parsedTemplate, 5),
         scoringMethod: 'Weighted Rubric',
         tieBreaker: ['Highest weighted total score', 'Highest score in first criterion'],
         judgeInstructions: 'Use the uploaded rubric as the primary reference and apply scores consistently.',
@@ -362,7 +449,7 @@ export async function generateCriteriaWithAIFallback(params = {}) {
   if (Array.isArray(result)) {
     return result.map((option, index) => ({
       profile: option.profile || `Profile ${index + 1}`,
-      criteria: Array.isArray(option.criteria) ? option.criteria : [],
+      criteria: ensureMinimumCriteria(Array.isArray(option.criteria) ? option.criteria : [], 5),
       scoringMethod: option.scoringMethod || 'Weighted Rubric',
       tieBreaker: Array.isArray(option.tieBreaker) ? option.tieBreaker : ['Highest weighted total score'],
       judgeInstructions: option.judgeInstructions || '',
@@ -375,6 +462,7 @@ export async function generateCriteriaWithAIFallback(params = {}) {
 
   return [{
     ...result,
+    criteria: ensureMinimumCriteria(Array.isArray(result?.criteria) ? result.criteria : [], 5),
     source,
     modelUsed,
     requestId,

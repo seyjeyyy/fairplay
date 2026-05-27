@@ -51,7 +51,7 @@ Rules:
 - Total criteria weight per profile must equal 100.
 - Support audience impact only when appropriate for the event.
 - If this is a sports fest or multi-event, tailor the rubric to the selected sub-event.
-- Include at least 4 criteria.
+- Include at least 5 criteria in every profile.
 - Include practical descriptions and judge instructions.
 - Use the uploaded template if provided, but improve it professionally.
 - Respect the organizer prompt override.
@@ -126,7 +126,7 @@ function normalizeProfiles(rawProfiles = []) {
         : ['Highest weighted total score'],
       judgeInstructions: profile.judgeInstructions || 'Apply the rubric consistently across all contestants.',
     }))
-    .filter((profile) => profile.criteria.length >= 3);
+    .filter((profile) => profile.criteria.length >= 5);
 }
 
 export async function requestCriteriaProfiles(payload) {
