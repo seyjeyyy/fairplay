@@ -51,6 +51,22 @@ function isPendingOrganizer(user) {
   return user?.role === 'organizer' && user?.status !== 'active';
 }
 
+function buildOrganizerApplication(userData = {}) {
+  const email = String(userData.email || '').trim().toLowerCase();
+  const name = String(userData.name || userData.full_name || email || 'Organizer Applicant').trim();
+  return {
+    id: userData.id || `application-${Date.now()}`,
+    email,
+    name,
+    role: 'organizer',
+    status: 'pending',
+    avatar: buildAvatar(name, email),
+    joined: userData.joined || new Date().toISOString().slice(0, 10),
+    password: userData.password,
+    source: userData.source || 'signup',
+  };
+}
+
 function mapProfileRow(profile) {
   if (!profile) return null;
   return {
@@ -156,6 +172,7 @@ const useAuthStore = create(
       user: null,
       token: null,
       users: SEED_USERS.map(({ password, ...entry }) => entry),
+      organizerApplications: [],
       loading: true,
       initialized: false,
       authMode: HYBRID_MODE ? 'hybrid' : SUPABASE_AUTH_ENABLED ? 'supabase' : 'demo',
@@ -269,8 +286,15 @@ const useAuthStore = create(
 
           return { success: true, user: sessionUser };
         } catch (error) {
-          const safeUser = getSeedUser(normalizedEmail, password);
+          const safeUser = getSeedUser(normalizedEmail, password) || get().users.find((entry) =>
+            String(entry.email || '').toLowerCase() === normalizedEmail &&
+            entry.password === password
+          );
           if (safeUser) {
+            if (isPendingOrganizer(safeUser)) {
+              set({ loading: false, initialized: true });
+              return { success: false, error: 'Your organizer account is pending admin approval.' };
+            }
             const token = `token_${safeUser.id}_${Date.now()}`;
             set({
               user: safeUser,
@@ -316,6 +340,10 @@ const useAuthStore = create(
             user: null,
             token: null,
             users: [newUser, ...state.users.filter((entry) => entry.email !== newUser.email)],
+            organizerApplications: [
+              buildOrganizerApplication(newUser),
+              ...state.organizerApplications.filter((entry) => entry.email !== newUser.email),
+            ],
             loading: false,
             initialized: true,
             authMode: 'demo',
@@ -348,23 +376,31 @@ const useAuthStore = create(
 
           const authUser = data.user;
           let sessionUser = null;
+          let organizerApplication = null;
 
           if (authUser) {
             const profile = await upsertProfileFromAuth(authUser, { full_name: name, role, status });
             sessionUser = mapProfileRow(profile);
+            organizerApplication = buildOrganizerApplication({ ...sessionUser, source: 'supabase-signup' });
           }
 
           const users = await fetchProfilesList().catch(() => get().users);
 
-          set({
+          set((state) => ({
             user: null,
             token: null,
             users,
+            organizerApplications: organizerApplication
+              ? [
+                  organizerApplication,
+                  ...state.organizerApplications.filter((entry) => entry.email !== organizerApplication.email),
+                ]
+              : state.organizerApplications,
             loading: false,
             initialized: true,
             authMode: 'supabase',
             sessionSource: 'supabase',
-          });
+          }));
 
           if (data.session) {
             await supabase.auth.signOut().catch(() => {});
@@ -395,6 +431,62 @@ const useAuthStore = create(
         };
         set((state) => ({ users: [newUser, ...state.users] }));
         return newUser;
+      },
+
+      approveOrganizerApplication: async (applicationId) => {
+        const application = get().organizerApplications.find((entry) => String(entry.id) === String(applicationId)) ||
+          get().users.find((entry) => String(entry.id) === String(applicationId));
+        if (!application) return null;
+
+        let approvedUser = null;
+        if (SUPABASE_AUTH_ENABLED && supabase && !String(application.id).startsWith('application-')) {
+          const { data, error } = await supabase
+            .from('profiles')
+            .update({ status: 'active', role: 'organizer', updated_at: new Date().toISOString() })
+            .eq('id', application.id)
+            .select()
+            .single();
+
+          if (error) throw error;
+          approvedUser = mapProfileRow(data);
+        }
+
+        approvedUser = approvedUser || {
+          ...application,
+          status: 'active',
+          role: 'organizer',
+          avatar: buildAvatar(application.name, application.email),
+        };
+
+        set((state) => ({
+          users: [
+            approvedUser,
+            ...state.users.filter((entry) => String(entry.id) !== String(application.id) && entry.email !== application.email),
+          ],
+          organizerApplications: state.organizerApplications.filter((entry) => String(entry.id) !== String(application.id) && entry.email !== application.email),
+        }));
+
+        return approvedUser;
+      },
+
+      declineOrganizerApplication: async (applicationId) => {
+        const application = get().organizerApplications.find((entry) => String(entry.id) === String(applicationId)) ||
+          get().users.find((entry) => String(entry.id) === String(applicationId));
+
+        if (SUPABASE_AUTH_ENABLED && supabase && application && !String(application.id).startsWith('application-')) {
+          await supabase.from('profiles').delete().eq('id', application.id);
+        }
+
+        set((state) => ({
+          users: state.users.filter((entry) =>
+            String(entry.id) !== String(applicationId) &&
+            (!application?.email || String(entry.email || '').toLowerCase() !== String(application.email || '').toLowerCase())
+          ),
+          organizerApplications: state.organizerApplications.filter((entry) =>
+            String(entry.id) !== String(applicationId) &&
+            (!application?.email || String(entry.email || '').toLowerCase() !== String(application.email || '').toLowerCase())
+          ),
+        }));
       },
 
       updateUser: async (userId, updates) => {
@@ -455,7 +547,18 @@ const useAuthStore = create(
 
       refreshProfiles: async () => {
         if (!SUPABASE_AUTH_ENABLED || !supabase) {
-          set({ users: SEED_USERS.map(({ password, ...entry }) => entry) });
+          set((state) => {
+            const seedUsers = SEED_USERS.map(({ password, ...entry }) => entry);
+            const seedEmails = new Set(seedUsers.map((entry) => entry.email.toLowerCase()));
+            const customUsers = state.users.filter((entry) => !seedEmails.has(String(entry.email || '').toLowerCase()));
+
+            return {
+              users: [
+                ...customUsers,
+                ...seedUsers,
+              ],
+            };
+          });
           return;
         }
 
@@ -498,6 +601,8 @@ const useAuthStore = create(
         token: state.token,
         authMode: state.authMode,
         sessionSource: state.sessionSource,
+        organizerApplications: state.organizerApplications,
+        users: state.users,
       }),
     }
   )
