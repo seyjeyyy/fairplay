@@ -5,6 +5,10 @@ import { isSupabaseConfigured, supabase } from '../utils/supabaseClient';
 const DEMO_MODE_ENABLED = import.meta.env.VITE_DEMO_MODE !== 'false';
 const SUPABASE_AUTH_ENABLED = isSupabaseConfigured;
 const HYBRID_MODE = isSupabaseConfigured && !DEMO_MODE_ENABLED;
+const APP_URL =
+  import.meta.env.VITE_SITE_URL ||
+  import.meta.env.VITE_APP_URL ||
+  (typeof window !== 'undefined' ? window.location.origin : '');
 
 const SEED_USERS = [
   { id: 1, email: 'admin@fairplay.com', password: 'Admin123!', name: 'Admin User', role: 'admin', avatar: 'A', status: 'active', joined: '2025-01-15' },
@@ -65,6 +69,36 @@ function buildOrganizerApplication(userData = {}) {
     password: userData.password,
     source: userData.source || 'signup',
   };
+}
+
+function getAuthRedirectUrl() {
+  const origin = String(APP_URL || '').replace(/\/$/, '');
+  return origin || undefined;
+}
+
+async function notifyOrganizerApproval(organizer) {
+  if (!SUPABASE_AUTH_ENABLED || !supabase || !organizer?.email) {
+    return { sent: false, skipped: true };
+  }
+
+  try {
+    const { data, error } = await supabase.functions.invoke('notify-organizer-approval', {
+      body: {
+        email: organizer.email,
+        name: organizer.name || organizer.email,
+        loginUrl: getAuthRedirectUrl(),
+      },
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return data || { sent: true };
+  } catch (error) {
+    console.warn('Approval email was not sent:', error?.message || error);
+    return { sent: false, error: error?.message || 'Approval email was not sent.' };
+  }
 }
 
 function mapProfileRow(profile) {
@@ -362,6 +396,7 @@ const useAuthStore = create(
             email,
             password,
             options: {
+              emailRedirectTo: getAuthRedirectUrl(),
               data: {
                 full_name: name,
                 role,
@@ -465,6 +500,8 @@ const useAuthStore = create(
           ],
           organizerApplications: state.organizerApplications.filter((entry) => String(entry.id) !== String(application.id) && entry.email !== application.email),
         }));
+
+        await notifyOrganizerApproval(approvedUser);
 
         return approvedUser;
       },
