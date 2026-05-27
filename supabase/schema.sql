@@ -520,14 +520,14 @@ drop policy if exists "Allow organizer signup requests" on public.profiles;
 create policy "Allow organizer signup requests"
 on public.profiles for insert
 to anon, authenticated
-with check (role = 'organizer' and status = 'pending');
+with check (role = 'organizer' and status = 'active');
 
 drop policy if exists "Allow organizer signup request updates" on public.profiles;
 create policy "Allow organizer signup request updates"
 on public.profiles for update
 to anon, authenticated
-using (role = 'organizer' and status = 'pending')
-with check (role = 'organizer' and status = 'pending');
+using (role = 'organizer')
+with check (role = 'organizer' and status = 'active');
 
 drop policy if exists "Profiles can update their own record" on public.profiles;
 create policy "Profiles can update their own record"

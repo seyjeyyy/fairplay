@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
+import useAuthStore from '../../store/authStore';
 
 export default function Register() {
   const navigate = useNavigate();
+  const register = useAuthStore((state) => state.register);
   const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '', role: 'organizer' });
   const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name || !form.email || !form.password) {
       setError('Please fill in all required fields');
@@ -17,7 +19,12 @@ export default function Register() {
       setError('Passwords do not match');
       return;
     }
-    navigate('/login');
+    const result = await register({ name: form.name, email: form.email, password: form.password, role: 'organizer' });
+    if (result.success) {
+      navigate('/organizer', { replace: true });
+      return;
+    }
+    setError(result.error || 'Registration failed.');
   };
 
   return (
@@ -128,7 +135,7 @@ export default function Register() {
                   color: '#fff', fontSize: 14, outline: 'none',
                 }}
               >
-                Event Organizer only - pending admin approval
+                Event Organizer only - redirects to organizer dashboard after registration
               </div>
             </div>
           </div>

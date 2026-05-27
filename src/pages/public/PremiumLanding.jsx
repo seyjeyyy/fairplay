@@ -53,8 +53,8 @@ const AuthModal = ({ mode: initialMode, onClose }) => {
     if (regData.password !== regData.confirmPassword) { setError('Passwords do not match.'); return; }
     const result = await store.register({ name: regData.name, email: regData.email, password: regData.password, role: 'organizer' });
     if (result.success) {
-      setMode('login');
-      setError(result.message || 'Organizer account submitted. Please wait for admin approval before signing in.');
+      onClose();
+      redirectAfterLogin(result.user);
     } else {
       setError(result.error || 'Registration failed.');
     }
@@ -139,7 +139,7 @@ const AuthModal = ({ mode: initialMode, onClose }) => {
               <div className="fp-field">
                 <label>Role</label>
                 <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.18)', color: '#bae6fd', fontWeight: 700 }}>
-                  Organizer only, pending admin approval
+                  Organizer only. You will go straight to your dashboard after registration.
                 </div>
               </div>
             </div>

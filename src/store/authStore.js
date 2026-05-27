@@ -51,10 +51,6 @@ function getSeedUser(email, password) {
   return safeUser;
 }
 
-function isPendingOrganizer(user) {
-  return user?.role === 'organizer' && user?.status !== 'active';
-}
-
 function buildOrganizerApplication(userData = {}) {
   const email = String(userData.email || '').trim().toLowerCase();
   const name = String(userData.name || userData.full_name || email || 'Organizer Applicant').trim();
@@ -208,14 +204,14 @@ async function fetchProfilesList() {
   return data.map(mapProfileRow);
 }
 
-function createPendingProfileId() {
+function createOrganizerProfileId() {
   const random = typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  return `pending-${random}`;
+  return `organizer-${random}`;
 }
 
-async function createPendingOrganizerProfile({ email, name, password }) {
+async function createActiveOrganizerProfile({ email, name, password }) {
   const now = new Date().toISOString();
   const existing = await supabase
     .from('profiles')
@@ -228,21 +224,27 @@ async function createPendingOrganizerProfile({ email, name, password }) {
   }
 
   if (existing.data?.status === 'active') {
-    throw new Error('This email already has an active account.');
+    return mapProfileRow({
+      ...existing.data,
+      metadata: {
+        ...(existing.data?.metadata || {}),
+        pendingPassword: existing.data?.metadata?.pendingPassword || password,
+      },
+    });
   }
 
   const payload = {
-    id: existing.data?.id || createPendingProfileId(),
+    id: existing.data?.id || createOrganizerProfileId(),
     email,
     full_name: name,
     role: 'organizer',
     avatar_url: existing.data?.avatar_url || '',
-    status: 'pending',
+    status: 'active',
     metadata: {
       ...(existing.data?.metadata || {}),
-      source: 'organizer-signup',
+      source: 'organizer-signup-direct',
       pendingPassword: password,
-      requestedAt: now,
+      approvedAt: now,
     },
     created_at: existing.data?.created_at || now,
     updated_at: now,
@@ -343,11 +345,6 @@ const useAuthStore = create(
             return { success: false, error: 'Invalid email or password.' };
           }
 
-          if (isPendingOrganizer(safeUser)) {
-            set({ loading: false, initialized: true });
-            return { success: false, error: 'Your organizer account is pending admin approval.' };
-          }
-
           const token = `token_${safeUser.id}_${Date.now()}`;
           set({ user: safeUser, token, loading: false, initialized: true, authMode: 'demo', sessionSource: 'demo' });
           return { success: true, user: safeUser };
@@ -364,11 +361,6 @@ const useAuthStore = create(
           }
 
           const sessionUser = await buildSessionUser(data.user);
-          if (isPendingOrganizer(sessionUser)) {
-            await supabase.auth.signOut().catch(() => {});
-            set({ user: null, token: null, loading: false, initialized: true });
-            return { success: false, error: 'Your organizer account is pending admin approval.' };
-          }
           const users = await fetchProfilesList().catch(() => get().users);
 
           set({
@@ -389,10 +381,6 @@ const useAuthStore = create(
             entry.password === password
           );
           if (safeUser) {
-            if (isPendingOrganizer(safeUser)) {
-              set({ loading: false, initialized: true });
-              return { success: false, error: 'Your organizer account is pending admin approval.' };
-            }
             const token = `token_${safeUser.id}_${Date.now()}`;
             set({
               user: safeUser,
@@ -421,7 +409,7 @@ const useAuthStore = create(
         const password = String(userData?.password || '');
         const role = 'organizer';
         const name = String(userData?.name || '').trim() || email || 'FairPlay User';
-        const status = 'pending';
+        const status = 'active';
 
         if (!SUPABASE_AUTH_ENABLED || !supabase) {
           const newUser = {
@@ -434,14 +422,13 @@ const useAuthStore = create(
             status,
             joined: new Date().toISOString().slice(0, 10),
           };
+          const safeUser = { ...newUser, password: undefined };
+          const token = `token_${newUser.id}_${Date.now()}`;
           set((state) => ({
-            user: null,
-            token: null,
+            user: safeUser,
+            token,
             users: [newUser, ...state.users.filter((entry) => entry.email !== newUser.email)],
-            organizerApplications: [
-              buildOrganizerApplication(newUser),
-              ...state.organizerApplications.filter((entry) => entry.email !== newUser.email),
-            ],
+            organizerApplications: state.organizerApplications.filter((entry) => entry.email !== newUser.email),
             loading: false,
             initialized: true,
             authMode: 'demo',
@@ -449,39 +436,52 @@ const useAuthStore = create(
           }));
           return {
             success: true,
-            user: newUser,
-            requiresApproval: true,
-            message: 'Organizer account submitted. Please wait for admin approval before signing in.',
+            user: safeUser,
+            requiresApproval: false,
+            message: 'Organizer account created.',
           };
         }
 
         try {
-          const pendingOrganizer = await createPendingOrganizerProfile({ email, name, password });
-          const organizerApplication = buildOrganizerApplication({ ...pendingOrganizer, password, source: 'organizer-signup' });
+          let organizer = null;
+          try {
+            organizer = await createActiveOrganizerProfile({ email, name, password });
+          } catch (profileError) {
+            console.warn('Organizer profile save failed; continuing with local session:', profileError?.message || profileError);
+          }
 
+          const fallbackOrganizer = {
+            id: organizer?.id || Date.now(),
+            email,
+            name,
+            role,
+            password,
+            avatar: buildAvatar(name, email),
+            status,
+            joined: new Date().toISOString().slice(0, 10),
+          };
+          const sessionUser = { ...(organizer || fallbackOrganizer), status: 'active', role: 'organizer', password: undefined };
           const users = await fetchProfilesList().catch(() => get().users);
+          const nextUsers = [organizer || fallbackOrganizer, ...users.filter((entry) => String(entry.email || '').toLowerCase() !== email)];
+          const token = `token_${sessionUser.id}_${Date.now()}`;
 
           set((state) => ({
-            user: null,
-            token: null,
-            users,
-            organizerApplications: [
-              organizerApplication,
-              ...buildOrganizerApplicationsFromUsers(users).filter((entry) => entry.email !== organizerApplication.email),
-              ...state.organizerApplications.filter((entry) => entry.email !== organizerApplication.email),
-            ],
+            user: sessionUser,
+            token,
+            users: nextUsers,
+            organizerApplications: state.organizerApplications.filter((entry) => entry.email !== email),
             loading: false,
             initialized: true,
             authMode: 'supabase',
-            sessionSource: 'supabase',
+            sessionSource: organizer ? 'supabase' : 'demo',
           }));
 
           return {
             success: true,
-            user: pendingOrganizer,
-            requiresApproval: true,
+            user: sessionUser,
+            requiresApproval: false,
             requiresEmailConfirmation: false,
-            message: 'Organizer request submitted. Admin approval is required before signing in.',
+            message: 'Organizer account created.',
           };
         } catch (error) {
           set({ loading: false, initialized: true });

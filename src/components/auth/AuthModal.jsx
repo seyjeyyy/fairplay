@@ -119,12 +119,6 @@ export default function AuthModal({ onClose }) {
 
     const result = await store.register({ name, email, password, role: 'organizer' });
     if (result.success) {
-      if (result.requiresApproval) {
-        setNotice(result.message || 'Organizer account submitted. Please wait for admin approval before signing in.');
-        setRegData({ name: '', email: '', password: '', confirmPassword: '', role: 'organizer' });
-        setAcceptedTerms(false);
-        return;
-      }
       if (result.requiresEmailConfirmation) {
         setMode('login');
         setNotice(result.message || 'Account created. Please confirm your email before signing in.');
@@ -167,7 +161,7 @@ export default function AuthModal({ onClose }) {
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'center',
-        padding: '16px 20px',
+        padding: '10px 16px 18px',
         overflowY: 'auto',
       }}
     >
@@ -177,7 +171,7 @@ export default function AuthModal({ onClose }) {
         borderRadius: 28,
         width: '100%',
         maxWidth: 540,
-        maxHeight: 'calc(100vh - 32px)',
+        maxHeight: 'calc(100vh - 20px)',
         boxShadow: '0 30px 120px rgba(0,0,0,0.56)',
         overflowY: 'auto',
         overflowX: 'hidden',
@@ -206,8 +200,8 @@ export default function AuthModal({ onClose }) {
           <i className="bi bi-x-lg" />
         </button>
 
-        <div style={{ padding: '24px 32px 0', textAlign: 'center' }}>
-          <div style={{ width: 48, height: 48, margin: '0 auto 12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ padding: '18px 32px 0', textAlign: 'center' }}>
+          <div style={{ width: 42, height: 42, margin: '0 auto 10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <img src="/icon.svg" alt="FairPlay" style={{ width: '100%', height: '100%', filter: 'drop-shadow(0 0 15px rgba(6, 182, 212, 0.5))' }} />
           </div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 999, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.18)', color: '#67e8f9', fontSize: 12, fontWeight: 700, marginBottom: 10 }}>
@@ -217,11 +211,11 @@ export default function AuthModal({ onClose }) {
           <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 6, color: '#f8fafc' }}>
             {mode === 'login' ? 'Welcome Back' : 'Create Organizer Account'}
           </h2>
-          <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 18 }}>
-            {mode === 'login' ? 'Access your FairPlay workspace and continue your workflow.' : 'Register as an organizer. Admin approval is required before dashboard access.'}
+          <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 14 }}>
+            {mode === 'login' ? 'Access your FairPlay workspace and continue your workflow.' : 'Register as an organizer and go straight to your dashboard.'}
           </p>
 
-          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 4, marginBottom: 18 }}>
+          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 4, marginBottom: 14 }}>
             <button
               onClick={() => { setMode('login'); setError(''); setNotice(''); }}
               style={{
@@ -255,7 +249,7 @@ export default function AuthModal({ onClose }) {
           </div>
         </div>
 
-        <div style={{ padding: '0 32px 24px' }}>
+        <div style={{ padding: '0 32px 20px' }}>
           {error && (
             <div style={{ padding: 12, borderRadius: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#fca5a5', fontSize: 13, marginBottom: 20, textAlign: 'center' }}>
               {error}
@@ -332,7 +326,7 @@ export default function AuthModal({ onClose }) {
                   <input type="text" value={regData.name} onChange={(event) => setRegData((current) => ({ ...current, name: event.target.value }))} autoFocus style={inputStyle} />
                 </Field>
                 <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.18)', color: '#bae6fd', fontSize: 13, fontWeight: 700 }}>
-                  Role: Organizer only. Your account will stay pending until an admin approves it.
+                  Role: Organizer only. You will be redirected to the organizer dashboard after registration.
                 </div>
               </div>
 
@@ -340,7 +334,7 @@ export default function AuthModal({ onClose }) {
                 <input type="email" value={regData.email} onChange={(event) => setRegData((current) => ({ ...current, email: event.target.value }))} style={inputStyle} />
               </Field>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 12 }}>
                 <Field label="Password" noMargin>
                   <div style={{ position: 'relative' }}>
                     <input type={showRegisterPassword ? 'text' : 'password'} value={regData.password} onChange={(event) => setRegData((current) => ({ ...current, password: event.target.value }))} style={inputStyle} />

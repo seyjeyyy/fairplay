@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Lock, Trash2, Search, RefreshCw, X } from 'lucide-react';
+import { Lock, Trash2, Search, RefreshCw } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import useAuthStore from '../../store/authStore';
 import useEventStore from '../../store/eventStore';
@@ -10,12 +10,9 @@ import useRegistrationStore from '../../store/registrationStore';
 export default function AdminUsers() {
   const {
     users,
-    organizerApplications,
     refreshProfiles,
     updateUser,
     deleteUser,
-    approveOrganizerApplication,
-    declineOrganizerApplication,
     authMode,
   } = useAuthStore();
   const { events, fetchEvents } = useEventStore();
@@ -30,23 +27,6 @@ export default function AdminUsers() {
     fetchJudges();
     fetchRegistrations();
   }, [fetchEvents, fetchJudges, fetchRegistrations, refreshProfiles]);
-
-  const pendingOrganizerApprovals = useMemo(() => {
-    const fromApplications = organizerApplications || [];
-    const fromUsers = users.filter((user) => user.role === 'organizer' && user.status === 'pending');
-    const byEmail = new Map();
-
-    [...fromApplications, ...fromUsers].forEach((entry) => {
-      if (!entry?.email) return;
-      byEmail.set(String(entry.email).toLowerCase(), {
-        ...entry,
-        role: 'organizer',
-        status: 'pending',
-      });
-    });
-
-    return [...byEmail.values()];
-  }, [organizerApplications, users]);
 
   const visibleUsers = users;
 
@@ -92,20 +72,6 @@ export default function AdminUsers() {
     setBusy('');
   }
 
-  async function handleApproveOrganizer(user) {
-    setBusy(`approve-${user.id}`);
-    await approveOrganizerApplication(user.id);
-    await refreshProfiles();
-    setBusy('');
-  }
-
-  async function handleDeclineOrganizer(user) {
-    if (!window.confirm(`Decline organizer signup for ${user.email}?`)) return;
-    setBusy(`decline-${user.id}`);
-    await declineOrganizerApplication(user.id);
-    setBusy('');
-  }
-
   async function handleDelete(user) {
     if (!window.confirm(`Delete ${user.email}?`)) return;
     setBusy(`delete-${user.id}`);
@@ -124,44 +90,6 @@ export default function AdminUsers() {
           <RefreshCw size={16} />
           Refresh Database
         </button>
-      </div>
-
-      <div style={approvalCardStyle}>
-        <div style={approvalHeaderStyle}>
-          <div>
-            <div style={approvalEyebrowStyle}>Organizer sign-up approvals</div>
-            <h3 style={approvalTitleStyle}>Pending Organizer Requests</h3>
-          </div>
-          <span style={approvalCountStyle}>{pendingOrganizerApprovals.length} pending</span>
-        </div>
-
-        {pendingOrganizerApprovals.length === 0 ? (
-          <div style={emptyApprovalStyle}>No organizer signup requests waiting for approval.</div>
-        ) : (
-          <div style={{ display: 'grid', gap: 10 }}>
-            {pendingOrganizerApprovals.map((applicant) => (
-              <div key={applicant.id || applicant.email} style={approvalRowStyle}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                  <span style={{ ...avatarStyle, background: '#fef3c7', color: '#b45309' }}>{String(applicant.name || applicant.email || 'O').charAt(0).toUpperCase()}</span>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ color: '#0f172a', fontWeight: 900, fontSize: 14 }}>{applicant.name || 'Organizer Applicant'}</div>
-                    <div style={{ color: '#475569', fontSize: 13, wordBreak: 'break-word' }}>{applicant.email}</div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  <button onClick={() => handleApproveOrganizer(applicant)} disabled={Boolean(busy)} style={approveButtonStyle}>
-                    <CheckCircle2 size={15} />
-                    Approve
-                  </button>
-                  <button onClick={() => handleDeclineOrganizer(applicant)} disabled={Boolean(busy)} style={declineButtonStyle}>
-                    <X size={15} />
-                    Decline
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       <div style={cardStyle}>
@@ -199,16 +127,6 @@ export default function AdminUsers() {
                       <button onClick={() => handleToggleStatus(user)} disabled={Boolean(busy)} style={iconButtonStyle} aria-label="Toggle user status">
                         <Lock size={14} />
                       </button>
-                      {user.role === 'organizer' && user.status === 'pending' && (
-                        <button onClick={() => handleApproveOrganizer(user)} disabled={Boolean(busy)} style={{ ...iconButtonStyle, background: 'rgba(34,197,94,0.10)', borderColor: 'rgba(34,197,94,0.24)', color: '#16a34a' }} aria-label="Approve organizer signup" title="Approve organizer">
-                          <CheckCircle2 size={14} />
-                        </button>
-                      )}
-                      {user.role === 'organizer' && user.status === 'pending' && (
-                        <button onClick={() => handleDeclineOrganizer(user)} disabled={Boolean(busy)} style={{ ...iconButtonStyle, background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.2)', color: '#ef4444' }} aria-label="Decline organizer signup" title="Decline organizer">
-                          <X size={14} />
-                        </button>
-                      )}
                       <button onClick={() => handleDelete(user)} disabled={Boolean(busy)} style={{ ...iconButtonStyle, background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.2)', color: '#ef4444' }} aria-label="Delete user">
                         <Trash2 size={14} />
                       </button>
@@ -226,15 +144,6 @@ export default function AdminUsers() {
 
 const cardStyle = { background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 18, padding: 24, boxShadow: '0 12px 32px rgba(15,23,42,0.06)' };
 const toolbarStyle = { background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 16, boxShadow: '0 10px 24px rgba(15,23,42,0.06)', display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 };
-const approvalCardStyle = { background: '#ffffff', border: '1px solid #dbeafe', borderRadius: 18, padding: 20, boxShadow: '0 12px 32px rgba(37,99,235,0.08)', marginBottom: 20 };
-const approvalHeaderStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14, flexWrap: 'wrap' };
-const approvalEyebrowStyle = { color: '#2563eb', fontSize: 12, fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 };
-const approvalTitleStyle = { margin: 0, color: '#0f172a', fontSize: 18, fontWeight: 900 };
-const approvalCountStyle = { padding: '6px 10px', borderRadius: 999, background: 'rgba(245,158,11,0.14)', color: '#b45309', fontSize: 12, fontWeight: 900 };
-const emptyApprovalStyle = { padding: 16, borderRadius: 14, background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#475569', fontSize: 14 };
-const approvalRowStyle = { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 14, alignItems: 'center', padding: 14, borderRadius: 14, background: '#f8fafc', border: '1px solid #e2e8f0' };
-const approveButtonStyle = { padding: '9px 12px', borderRadius: 10, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.25)', color: '#15803d', display: 'inline-flex', alignItems: 'center', gap: 7, fontWeight: 900, cursor: 'pointer' };
-const declineButtonStyle = { padding: '9px 12px', borderRadius: 10, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.24)', color: '#dc2626', display: 'inline-flex', alignItems: 'center', gap: 7, fontWeight: 900, cursor: 'pointer' };
 const searchStyle = { padding: '10px 14px 10px 34px', borderRadius: 10, background: '#ffffff', border: '1px solid #e2e8f0', color: '#0f172a', fontSize: 13, outline: 'none', width: '100%' };
 const secondaryButtonStyle = { padding: '10px 16px', borderRadius: 10, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 };
 const thStyle = { padding: '12px 16px', textAlign: 'left', fontSize: 12, color: '#64748b', fontWeight: 700, textTransform: 'uppercase' };
