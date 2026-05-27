@@ -30,6 +30,41 @@ const ROLES = [
   { role: 'Admins',       body: 'Monitor AI usage, approvals, audit trails, and overall platform health in one place.' },
 ];
 
+function formatEventDate(raw) {
+  if (!raw) return 'Schedule to be announced';
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return 'Schedule to be announced';
+  return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function normalizePublicEvent(event) {
+  const metadata = event.metadata && typeof event.metadata === 'object' ? event.metadata : {};
+  const startDate = event.start_date || metadata.startDate || event.startDate || null;
+  const endDate = event.end_date || metadata.endDate || event.endDate || null;
+  const now = Date.now();
+  const startTime = startDate ? new Date(startDate).getTime() : 0;
+  const endTime = endDate ? new Date(endDate).getTime() : startTime;
+  const status = String(event.status || '').toLowerCase();
+  const isOngoing = ['active', 'ongoing', 'live'].includes(status) || (startTime && startTime <= now && (!endTime || endTime >= now));
+  const isUpcoming = ['upcoming', 'approved', 'published'].includes(status) || (startTime && startTime > now);
+
+  return {
+    id: event.id,
+    title: event.title || metadata.title || 'Untitled Event',
+    description: event.description || metadata.description || 'Event details will be announced soon.',
+    category: event.type || metadata.eventType || metadata.category || 'Event',
+    location: event.location || metadata.location || 'Venue to be announced',
+    startDate,
+    endDate,
+    status,
+    isOngoing,
+    isUpcoming,
+    participants: Number(event.participants || 0),
+    maxParticipants: Number(event.max_participants || event.maxParticipants || 0),
+    startTime: startTime || Number.MAX_SAFE_INTEGER,
+  };
+}
+
 // ─── Animated Particles ───────────────────────────────────────────────────────
 function initParticles(canvas) {
   const W = canvas.offsetWidth, H = canvas.offsetHeight;
@@ -173,6 +208,11 @@ export default function Landing() {
     topTeams: [],
     judgeActivity: [],
   });
+  const [eventShowcase, setEventShowcase] = useState({
+    loading: true,
+    ongoing: [],
+    upcoming: [],
+  });
 
   useEffect(() => {
     let isActive = true;
@@ -185,12 +225,13 @@ export default function Landing() {
             loading: false,
             error: isSupabaseConfigured ? 'Supabase client unavailable.' : 'Supabase not configured.',
           }));
+          setEventShowcase({ loading: false, ongoing: [], upcoming: [] });
         }
         return;
       }
 
       const [eventsRes, judgesRes, scoresRes, teamsRes] = await Promise.all([
-        supabase.from('events').select('id,title,status'),
+        supabase.from('events').select('id,title,type,status,description,location,start_date,end_date,participants,max_participants,metadata'),
         supabase.from('judges').select('id,name'),
         supabase.from('scores').select('id,total_score,team_id,judge_id,locked,event_title,event_id'),
         supabase.from('teams').select('id,name'),
@@ -204,6 +245,7 @@ export default function Landing() {
             loading: false,
             error: firstError.message || 'Failed to load dashboard data.',
           }));
+          setEventShowcase({ loading: false, ongoing: [], upcoming: [] });
         }
         return;
       }
@@ -285,6 +327,18 @@ export default function Landing() {
         intensity: item.count / maxJudgeCount,
       }));
 
+      const publicEvents = events
+        .map(normalizePublicEvent)
+        .filter(event => event.status !== 'archived' && event.status !== 'rejected');
+      const ongoing = publicEvents
+        .filter(event => event.isOngoing)
+        .sort((a, b) => a.startTime - b.startTime)
+        .slice(0, 3);
+      const upcoming = publicEvents
+        .filter(event => event.isUpcoming && !event.isOngoing)
+        .sort((a, b) => a.startTime - b.startTime)
+        .slice(0, 4);
+
       if (isActive) {
         setDashboard({
           loading: false,
@@ -297,6 +351,7 @@ export default function Landing() {
           topTeams,
           judgeActivity,
         });
+        setEventShowcase({ loading: false, ongoing, upcoming });
       }
     };
 
@@ -492,24 +547,78 @@ export default function Landing() {
       <section id="features" className="lp-light" style={{ background: '#fff', padding: '96px 28px' }}>
         <div style={{ maxWidth: 1240, margin: '0 auto' }}>
           <div className="fp-sec-hdr" style={{ textAlign: 'center', marginBottom: 56 }}>
-            <div style={{ color: '#2563eb', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 10 }}>Core Features</div>
-            <h2 style={{ fontSize: 'clamp(26px,4.5vw,44px)', fontWeight: 900, letterSpacing: '-0.04em', marginBottom: 12, color: '#0f172a' }}>Built for real event pressure.</h2>
-            <p style={{ fontSize: 17, lineHeight: 1.7, maxWidth: 540, margin: '0 auto', color: '#475569' }}>Every role gets a cleaner workflow while AI and automation reduce repetitive setup work.</p>
+            <div style={{ color: '#2563eb', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 10 }}>Live Events</div>
+            <h2 style={{ fontSize: 'clamp(26px,4.5vw,44px)', fontWeight: 900, letterSpacing: '-0.04em', marginBottom: 12, color: '#0f172a' }}>Ongoing events you can join now.</h2>
+            <p style={{ fontSize: 17, lineHeight: 1.7, maxWidth: 620, margin: '0 auto', color: '#475569' }}>Visitors can see active competitions immediately, register, and preview what is coming next.</p>
           </div>
-          <div className="feat-grid">
-            {FEATURES.map(({ icon: Icon, title, body }, i) => (
-              <div key={title} className="fp-feat" data-i={i}
-                style={{ background: '#f8fafc', border: '1px solid rgba(37,99,235,0.11)', borderRadius: 20, padding: '26px 24px', transition: 'transform .22s ease,box-shadow .22s ease', cursor: 'default' }}
-                onMouseEnter={e => { e.currentTarget.style.transform='translateY(-5px)'; e.currentTarget.style.boxShadow='0 14px 40px rgba(37,99,235,0.11)'; }}
-                onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=''; }}>
-                <div style={{ width: 44, height: 44, borderRadius: 11, background: 'rgba(37,99,235,0.08)', display: 'grid', placeItems: 'center', marginBottom: 16, color: '#2563eb', border: '1px solid rgba(37,99,235,0.13)' }}>
-                  <Icon size={21} />
+
+          {eventShowcase.loading ? (
+            <div style={{ textAlign: 'center', color: '#64748b', padding: 40 }}>Loading public events...</div>
+          ) : eventShowcase.ongoing.length > 0 ? (
+            <div className="feat-grid" style={{ marginBottom: 42 }}>
+              {eventShowcase.ongoing.map((event, i) => (
+                <div key={event.id} className="fp-feat" data-i={i}
+                  style={{ background: '#f8fafc', border: '1px solid rgba(37,99,235,0.14)', borderRadius: 20, padding: '26px 24px', transition: 'transform .22s ease,box-shadow .22s ease', minHeight: 260, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
+                  onMouseEnter={e => { e.currentTarget.style.transform='translateY(-5px)'; e.currentTarget.style.boxShadow='0 14px 40px rgba(37,99,235,0.12)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=''; }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 16 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 999, background: '#dcfce7', color: '#15803d', fontSize: 12, fontWeight: 900 }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e' }} />
+                        Ongoing
+                      </span>
+                      <span style={{ color: '#2563eb', fontSize: 12, fontWeight: 800, textTransform: 'capitalize' }}>{event.category}</span>
+                    </div>
+                    <h3 style={{ fontSize: 20, lineHeight: 1.15, fontWeight: 900, marginBottom: 10, color: '#0f172a' }}>{event.title}</h3>
+                    <p style={{ color: '#475569', lineHeight: 1.6, margin: 0, fontSize: 14 }}>{event.description.length > 105 ? `${event.description.slice(0, 102)}...` : event.description}</p>
+                    <div style={{ display: 'grid', gap: 8, marginTop: 18, color: '#334155', fontSize: 13, fontWeight: 700 }}>
+                      <span><i className="bi bi-calendar-event" style={{ color: '#2563eb', marginRight: 8 }} />{formatEventDate(event.startDate)}</span>
+                      <span><i className="bi bi-geo-alt" style={{ color: '#2563eb', marginRight: 8 }} />{event.location}</span>
+                      <span><i className="bi bi-people" style={{ color: '#2563eb', marginRight: 8 }} />{event.participants}{event.maxParticipants ? ` / ${event.maxParticipants}` : ''} participants</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 22 }}>
+                    <button onClick={() => navigate(`/participant/register?eventId=${event.id}`)} style={{ flex: '1 1 150px', border: 'none', borderRadius: 12, padding: '12px 14px', background: 'linear-gradient(135deg,#2563eb,#0ea5e9)', color: '#fff', fontWeight: 900, cursor: 'pointer' }}>
+                      Register
+                    </button>
+                    <button onClick={() => navigate(`/events/${event.id}`)} style={{ flex: '1 1 130px', border: '1px solid #bfdbfe', borderRadius: 12, padding: '12px 14px', background: '#fff', color: '#1d4ed8', fontWeight: 800, cursor: 'pointer' }}>
+                      Preview
+                    </button>
+                  </div>
                 </div>
-                <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 8, color: '#0f172a' }}>{title}</h3>
-                <p style={{ color: '#475569', lineHeight: 1.65, margin: 0, fontSize: 14 }}>{body}</p>
-              </div>
-            ))}
+              ))}
+            </div>
+          ) : (
+            <div style={{ background: '#f8fafc', border: '1px dashed #bfdbfe', borderRadius: 20, padding: 34, textAlign: 'center', marginBottom: 42 }}>
+              <h3 style={{ fontSize: 20, fontWeight: 900, color: '#0f172a', marginBottom: 8 }}>No ongoing events right now</h3>
+              <p style={{ color: '#64748b', fontSize: 14 }}>Check the upcoming previews below or come back once an event goes live.</p>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'end', marginBottom: 18, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ color: '#2563eb', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 8 }}>Upcoming Preview</div>
+              <h3 style={{ fontSize: 26, fontWeight: 900, color: '#0f172a', margin: 0 }}>Next events on deck</h3>
+            </div>
           </div>
+
+          {eventShowcase.upcoming.length > 0 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+              {eventShowcase.upcoming.map(event => (
+                <button key={event.id} onClick={() => navigate(`/events/${event.id}`)}
+                  style={{ textAlign: 'left', background: '#ffffff', border: '1px solid #dbeafe', borderRadius: 18, padding: 18, cursor: 'pointer', boxShadow: '0 12px 28px rgba(37,99,235,0.06)' }}>
+                  <span style={{ display: 'inline-flex', marginBottom: 12, padding: '5px 9px', borderRadius: 999, background: '#eff6ff', color: '#1d4ed8', fontSize: 11, fontWeight: 900, textTransform: 'uppercase' }}>
+                    {formatEventDate(event.startDate)}
+                  </span>
+                  <h4 style={{ fontSize: 16, lineHeight: 1.25, fontWeight: 900, color: '#0f172a', marginBottom: 8 }}>{event.title}</h4>
+                  <p style={{ color: '#64748b', fontSize: 13, lineHeight: 1.55, marginBottom: 14 }}>{event.location}</p>
+                  <span style={{ color: '#2563eb', fontSize: 13, fontWeight: 900 }}>View preview <i className="bi bi-arrow-right" /></span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div style={{ color: '#64748b', fontSize: 14, padding: '18px 0' }}>No upcoming events have been published yet.</div>
+          )}
         </div>
       </section>
 
