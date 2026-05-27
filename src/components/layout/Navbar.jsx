@@ -48,7 +48,7 @@ export default function Navbar({ isMobile = false, onMenuToggle }) {
           ]
         : userRole === 'participant'
           ? [{ label: 'Profile', path: '/participant/profile', icon: 'bi bi-person' }]
-          : [{ label: 'Approval Board', path: '/approvals', icon: 'bi bi-diagram-3' }];
+          : [];
 
   useEffect(() => {
     const closeAll = () => {

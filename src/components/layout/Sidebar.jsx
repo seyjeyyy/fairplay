@@ -21,7 +21,6 @@ const NAV_GROUPS = {
         icon: 'bi bi-people',
         items: [
           { label: 'User Management', path: '/admin/users', icon: 'bi bi-people' },
-          { label: 'Approval Board', path: '/admin/roles', icon: 'bi bi-diagram-3' },
         ],
       },
       {
@@ -147,7 +146,6 @@ const NAV_GROUPS = {
         icon: 'bi bi-diagram-3',
         items: [
           { label: 'Approval Dashboard', path: '/institute-coordinator', icon: 'bi bi-grid' },
-          { label: 'Approval Board', path: '/approvals', icon: 'bi bi-diagram-3' },
         ],
       },
     ],
@@ -161,7 +159,6 @@ const NAV_GROUPS = {
         icon: 'bi bi-diagram-3',
         items: [
           { label: 'Approval Dashboard', path: '/sports-head', icon: 'bi bi-grid' },
-          { label: 'Approval Board', path: '/approvals', icon: 'bi bi-diagram-3' },
         ],
       },
     ],
@@ -175,7 +172,6 @@ const NAV_GROUPS = {
         icon: 'bi bi-diagram-3',
         items: [
           { label: 'Approval Dashboard', path: '/osds', icon: 'bi bi-grid' },
-          { label: 'Approval Board', path: '/approvals', icon: 'bi bi-diagram-3' },
         ],
       },
     ],
@@ -187,7 +183,6 @@ const EXACT_PATHS = new Set([
   '/organizer',
   '/judge',
   '/participant',
-  '/approvals',
   '/institute-coordinator',
   '/sports-head',
   '/osds',

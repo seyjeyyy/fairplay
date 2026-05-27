@@ -71,6 +71,12 @@ function buildOrganizerApplication(userData = {}) {
   };
 }
 
+function buildOrganizerApplicationsFromUsers(users = []) {
+  return users
+    .filter((user) => user?.role === 'organizer' && user?.status === 'pending')
+    .map((user) => buildOrganizerApplication(user));
+}
+
 function getAuthRedirectUrl() {
   const origin = String(APP_URL || '').replace(/\/$/, '');
   return origin || undefined;
@@ -237,6 +243,7 @@ const useAuthStore = create(
             user: sessionUser,
             token: session?.access_token || null,
             users: profiles.length > 0 ? profiles : get().users,
+            organizerApplications: buildOrganizerApplicationsFromUsers(profiles.length > 0 ? profiles : get().users),
             loading: false,
             initialized: true,
           });
@@ -259,6 +266,7 @@ const useAuthStore = create(
               user: nextUser,
               token: session?.access_token || null,
               users,
+              organizerApplications: buildOrganizerApplicationsFromUsers(users),
               loading: false,
               initialized: true,
             });
@@ -312,6 +320,7 @@ const useAuthStore = create(
             user: sessionUser,
             token: data.session?.access_token || null,
             users,
+            organizerApplications: buildOrganizerApplicationsFromUsers(users),
             loading: false,
             initialized: true,
             authMode: HYBRID_MODE ? 'hybrid' : 'supabase',
