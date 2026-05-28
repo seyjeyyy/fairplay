@@ -23,7 +23,7 @@ function isVotingAllowed(event) {
 export default function AudienceScoring() {
   const { eventId } = useParams();
   const { events, fetchEvents } = useEventStore();
-  const { submitAudienceScore, fetchAudienceScores, getAudienceSummary } = useAudienceScoreStore();
+  const { submitAudienceScore, fetchAudienceScores, getAudienceSummary, subscribeToAudienceScores } = useAudienceScoreStore();
   const [selectedContestantId, setSelectedContestantId] = useState('');
   const [score, setScore] = useState('');
   const [message, setMessage] = useState('');
@@ -40,6 +40,10 @@ export default function AudienceScoring() {
     load();
     return () => { mounted = false; };
   }, [eventId, fetchAudienceScores, fetchEvents]);
+
+  useEffect(() => {
+    return subscribeToAudienceScores(eventId);
+  }, [eventId, subscribeToAudienceScores]);
 
   const event = events.find((entry) => String(entry.id) === String(eventId)) || null;
   const contestants = Array.isArray(event?.contestants) ? event.contestants : [];

@@ -9,7 +9,7 @@ export default function PublicLeaderboard() {
   const { id } = useParams();
   const { events, fetchEvents } = useEventStore();
   const { fetchScores, calculateLeaderboard } = useScoreStore();
-  const { fetchAudienceScores } = useAudienceScoreStore();
+  const { fetchAudienceScores, subscribeToAudienceScores } = useAudienceScoreStore();
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -24,6 +24,10 @@ export default function PublicLeaderboard() {
     load();
     return () => { mounted = false; };
   }, [fetchAudienceScores, fetchEvents, fetchScores, id]);
+
+  useEffect(() => {
+    return subscribeToAudienceScores(id);
+  }, [id, subscribeToAudienceScores]);
 
   const event = events.find((entry) => String(entry.id) === String(id)) || null;
   const contestants = Array.isArray(event?.contestants) ? event.contestants : [];

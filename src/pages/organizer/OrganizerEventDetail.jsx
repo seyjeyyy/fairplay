@@ -170,7 +170,7 @@ export default function OrganizerEventDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { getEventById, fetchEvents, updateEvent } = useEventStore();
-  const { fetchAudienceScores, getAudienceSummary } = useAudienceScoreStore();
+  const { fetchAudienceScores, getAudienceSummary, subscribeToAudienceScores } = useAudienceScoreStore();
   const [fullscreenQR, setFullscreenQR] = useState(null);
   const [showAddContestant, setShowAddContestant] = useState(false);
   const [showAddScorer, setShowAddScorer] = useState(false);
@@ -180,6 +180,10 @@ export default function OrganizerEventDetail() {
     fetchEvents();
     fetchAudienceScores(id);
   }, [fetchAudienceScores, fetchEvents, id]);
+
+  useEffect(() => {
+    return subscribeToAudienceScores(id);
+  }, [id, subscribeToAudienceScores]);
 
   const event = getEventById(id);
 

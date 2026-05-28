@@ -20,7 +20,7 @@ export default function OrganizerScoring() {
   const { events, fetchEvents } = useEventStore();
   const { success } = useNotificationStore();
   const { fetchScores, getLiveFeed, calculateLeaderboard } = useScoreStore();
-  const { fetchAudienceScores, getAudienceSummary } = useAudienceScoreStore();
+  const { fetchAudienceScores, getAudienceSummary, subscribeToAudienceScores } = useAudienceScoreStore();
   const eventIdFromUrl = searchParams.get('eventId');
   const [selectedEvent, setSelectedEvent] = useState(eventIdFromUrl || '');
   const [activeTab, setActiveTab] = useState('leaderboard');
@@ -35,6 +35,11 @@ export default function OrganizerScoring() {
     fetchScores(selectedEvent || undefined);
     if (selectedEvent) fetchAudienceScores(selectedEvent);
   }, [fetchAudienceScores, fetchScores, selectedEvent]);
+
+  useEffect(() => {
+    if (!selectedEvent) return undefined;
+    return subscribeToAudienceScores(selectedEvent);
+  }, [selectedEvent, subscribeToAudienceScores]);
 
   const activeEvents = events.filter((event) => event.status === 'active' || event.status === 'upcoming');
   const selected = events.find((event) => String(event.id) === String(selectedEvent)) || null;

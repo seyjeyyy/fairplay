@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { isSupabaseConfigured, supabase } from '../utils/supabaseClient';
+import { isSupabaseConfigured, subscribeToTable, supabase } from '../utils/supabaseClient';
 
 const AUDIENCE_METADATA_KEY = 'audienceScores';
 
@@ -117,11 +117,12 @@ const useAudienceScoreStore = create(
       loading: false,
       error: null,
 
-      fetchAudienceScores: async (eventId) => {
-        set({ loading: true, error: null });
+      fetchAudienceScores: async (eventId, options = {}) => {
+        const { silent = false } = options;
+        if (!silent) set({ loading: true, error: null });
 
         if (!isSupabaseConfigured || !supabase) {
-          set({ loading: false });
+          if (!silent) set({ loading: false });
           return eventId ? get().getSubmissionsForEvent(eventId) : Object.values(get().submissions);
         }
 
@@ -160,9 +161,51 @@ const useAudienceScoreStore = create(
             }
           }
 
-          set({ loading: false, error: error?.message || 'Unable to load audience scores.' });
+          set({ loading: false, error: silent ? null : error?.message || 'Unable to load audience scores.' });
           return eventId ? get().getSubmissionsForEvent(eventId) : Object.values(get().submissions);
         }
+      },
+
+      subscribeToAudienceScores: (eventId) => {
+        if (!eventId || !isSupabaseConfigured || !supabase) {
+          return () => {};
+        }
+
+        let active = true;
+        let refreshTimer = null;
+        const refresh = () => {
+          if (!active) return;
+          window.clearTimeout(refreshTimer);
+          refreshTimer = window.setTimeout(() => {
+            get().fetchAudienceScores(eventId, { silent: true });
+          }, 150);
+        };
+
+        const unsubscribeAudienceScores = subscribeToTable({
+          table: 'audience_scores',
+          filter: `event_id=eq.${eventId}`,
+          onChange: refresh,
+        });
+
+        const unsubscribeEvents = subscribeToTable({
+          table: 'events',
+          filter: `id=eq.${eventId}`,
+          onChange: refresh,
+        });
+
+        const pollId = window.setInterval(() => {
+          get().fetchAudienceScores(eventId, { silent: true });
+        }, 3000);
+
+        get().fetchAudienceScores(eventId, { silent: true });
+
+        return () => {
+          active = false;
+          window.clearTimeout(refreshTimer);
+          window.clearInterval(pollId);
+          unsubscribeAudienceScores();
+          unsubscribeEvents();
+        };
       },
 
       submitAudienceScore: async ({ eventId, contestantId, contestantName, voterKey, score }) => {
