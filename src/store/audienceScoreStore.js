@@ -2,8 +2,25 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { isSupabaseConfigured, supabase } from '../utils/supabaseClient';
 
+const AUDIENCE_METADATA_KEY = 'audienceScores';
+
 function submissionKey(eventId, contestantId, voterKey) {
   return `${eventId}_${contestantId}_${voterKey}`;
+}
+
+function isAudienceScoreTableMissing(error) {
+  const message = String(error?.message || '').toLowerCase();
+  const code = String(error?.code || '').toLowerCase();
+
+  return (
+    code === 'pgrst205' ||
+    message.includes('schema cache') ||
+    message.includes('audience_scores') && (
+      message.includes('could not find the table') ||
+      message.includes('does not exist') ||
+      message.includes('not found')
+    )
+  );
 }
 
 function normalizeAudienceSubmission(row = {}) {
@@ -20,6 +37,77 @@ function normalizeAudienceSubmission(row = {}) {
     score: Number(row.score || 0),
     createdAt: row.createdAt || row.created_at || new Date().toISOString(),
   };
+}
+
+function normalizeAudienceList(rows = []) {
+  const incoming = {};
+  (Array.isArray(rows) ? rows : []).map(normalizeAudienceSubmission).forEach((submission) => {
+    incoming[submission.id] = submission;
+  });
+  return incoming;
+}
+
+async function fetchMetadataAudienceScores(eventId) {
+  if (!eventId || !supabase) return [];
+
+  const { data, error } = await supabase
+    .from('events')
+    .select('metadata')
+    .eq('id', eventId)
+    .single();
+
+  if (error) throw error;
+
+  const metadata = data?.metadata && typeof data.metadata === 'object' ? data.metadata : {};
+  return Array.isArray(metadata[AUDIENCE_METADATA_KEY]) ? metadata[AUDIENCE_METADATA_KEY] : [];
+}
+
+async function saveMetadataAudienceScore(eventId, submission) {
+  if (!eventId || !supabase) return submission;
+
+  const { data, error: fetchError } = await supabase
+    .from('events')
+    .select('metadata')
+    .eq('id', eventId)
+    .single();
+
+  if (fetchError) throw fetchError;
+
+  const metadata = data?.metadata && typeof data.metadata === 'object' ? data.metadata : {};
+  const existingRows = Array.isArray(metadata[AUDIENCE_METADATA_KEY]) ? metadata[AUDIENCE_METADATA_KEY] : [];
+  const existing = existingRows.map(normalizeAudienceSubmission);
+
+  if (existing.some((row) => row.id === submission.id || (
+    String(row.eventId) === String(submission.eventId) &&
+    String(row.contestantId) === String(submission.contestantId) &&
+    String(row.voterKey) === String(submission.voterKey)
+  ))) {
+    throw new Error('This device/session already submitted an audience score for this participant.');
+  }
+
+  const nextMetadata = {
+    ...metadata,
+    [AUDIENCE_METADATA_KEY]: [
+      ...existingRows,
+      {
+        id: submission.id,
+        eventId: submission.eventId,
+        contestantId: submission.contestantId,
+        contestantName: submission.contestantName,
+        voterKey: submission.voterKey,
+        score: submission.score,
+        createdAt: submission.createdAt,
+      },
+    ],
+  };
+
+  const { error: updateError } = await supabase
+    .from('events')
+    .update({ metadata: nextMetadata })
+    .eq('id', eventId);
+
+  if (updateError) throw updateError;
+  return submission;
 }
 
 const useAudienceScoreStore = create(
@@ -44,10 +132,7 @@ const useAudienceScoreStore = create(
           const { data, error } = await query;
           if (error) throw error;
 
-          const incoming = {};
-          (data || []).map(normalizeAudienceSubmission).forEach((submission) => {
-            incoming[submission.id] = submission;
-          });
+          const incoming = normalizeAudienceList(data || []);
 
           set((state) => ({
             submissions: { ...state.submissions, ...incoming },
@@ -57,6 +142,24 @@ const useAudienceScoreStore = create(
 
           return eventId ? get().getSubmissionsForEvent(eventId) : Object.values(get().submissions);
         } catch (error) {
+          if (eventId && isAudienceScoreTableMissing(error)) {
+            try {
+              const fallbackRows = await fetchMetadataAudienceScores(eventId);
+              const incoming = normalizeAudienceList(fallbackRows);
+
+              set((state) => ({
+                submissions: { ...state.submissions, ...incoming },
+                loading: false,
+                error: null,
+              }));
+
+              return get().getSubmissionsForEvent(eventId);
+            } catch (fallbackError) {
+              set({ loading: false, error: fallbackError?.message || 'Unable to load audience scores.' });
+              return get().getSubmissionsForEvent(eventId);
+            }
+          }
+
           set({ loading: false, error: error?.message || 'Unable to load audience scores.' });
           return eventId ? get().getSubmissionsForEvent(eventId) : Object.values(get().submissions);
         }
@@ -111,6 +214,17 @@ const useAudienceScoreStore = create(
           .single();
 
         if (error) {
+          if (isAudienceScoreTableMissing(error)) {
+            const saved = await saveMetadataAudienceScore(eventId, nextSubmission);
+            set((state) => ({ submissions: { ...state.submissions, [saved.id]: saved } }));
+            return saved;
+          }
+
+          set((state) => {
+            const { [id]: _removed, ...submissions } = state.submissions;
+            return { submissions };
+          });
+
           if (String(error.message || '').toLowerCase().includes('duplicate')) {
             throw new Error('This device/session already submitted an audience score for this participant.');
           }
