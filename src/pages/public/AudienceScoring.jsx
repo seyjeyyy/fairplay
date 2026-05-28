@@ -23,7 +23,7 @@ function isVotingAllowed(event) {
 export default function AudienceScoring() {
   const { eventId } = useParams();
   const { events, fetchEvents } = useEventStore();
-  const { submitAudienceScore, fetchAudienceScores, getAudienceSummary, subscribeToAudienceScores } = useAudienceScoreStore();
+  const { submitAudienceScore, fetchAudienceScores, getAudienceSummary, subscribeToAudienceScores, submissions } = useAudienceScoreStore();
   const [selectedContestantId, setSelectedContestantId] = useState('');
   const [score, setScore] = useState('');
   const [message, setMessage] = useState('');
@@ -47,7 +47,25 @@ export default function AudienceScoring() {
 
   const event = events.find((entry) => String(entry.id) === String(eventId)) || null;
   const contestants = Array.isArray(event?.contestants) ? event.contestants : [];
-  const summary = useMemo(() => getAudienceSummary(eventId), [eventId, getAudienceSummary]);
+  const summary = useMemo(() => getAudienceSummary(eventId), [eventId, getAudienceSummary, submissions]);
+  const audienceRanking = useMemo(() => (
+    contestants
+      .map((contestant) => {
+        const row = summary.byContestant[String(contestant.id)];
+        return {
+          contestant,
+          averageScore: row?.averageScore || 0,
+          count: row?.count || 0,
+          total: row?.total || 0,
+        };
+      })
+      .sort((left, right) => {
+        if (right.total !== left.total) return right.total - left.total;
+        if (right.averageScore !== left.averageScore) return right.averageScore - left.averageScore;
+        if (right.count !== left.count) return right.count - left.count;
+        return String(left.contestant.name || left.contestant.teamName || '').localeCompare(String(right.contestant.name || right.contestant.teamName || ''));
+      })
+  ), [contestants, summary]);
   const votingAllowed = isVotingAllowed(event);
 
   async function handleSubmit(submitEvent) {
@@ -161,15 +179,30 @@ export default function AudienceScoring() {
             </form>
 
             <div style={{ ...cardStyle, marginTop: 16 }}>
-              <h2 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 900 }}>Live Audience Results</h2>
-              <p style={{ margin: '0 0 14px', color: '#64748b', fontSize: 13 }}>{summary.totalSubmissions} audience submission{summary.totalSubmissions === 1 ? '' : 's'}</p>
+              <h2 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 900 }}>Live Audience Ranking</h2>
+              <p style={{ margin: '0 0 14px', color: '#64748b', fontSize: 13 }}>
+                {summary.totalSubmissions} audience vote{summary.totalSubmissions === 1 ? '' : 's'} counted live
+              </p>
               <div style={{ display: 'grid', gap: 8 }}>
-                {contestants.map((contestant) => {
-                  const row = summary.byContestant[String(contestant.id)];
+                {audienceRanking.map(({ contestant, averageScore, count, total }, index) => {
+                  const isLeader = index === 0 && count > 0;
                   return (
-                    <div key={contestant.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: 12, borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                      <span style={{ fontWeight: 800 }}>{contestant.name || contestant.teamName}</span>
-                      <span style={{ color: '#2563eb', fontWeight: 900 }}>{row ? `${row.averageScore.toFixed(2)} (${row.count})` : '--'}</span>
+                    <div key={contestant.id} style={{ display: 'grid', gridTemplateColumns: '38px minmax(0, 1fr) auto', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, background: isLeader ? '#eff6ff' : '#f8fafc', border: isLeader ? '1px solid #93c5fd' : '1px solid #e2e8f0' }}>
+                      <span style={{ width: 32, height: 32, borderRadius: 10, display: 'grid', placeItems: 'center', background: isLeader ? '#2563eb' : '#e0ecff', color: isLeader ? '#ffffff' : '#1d4ed8', fontWeight: 950, fontSize: 13 }}>
+                        #{index + 1}
+                      </span>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contestant.name || contestant.teamName}</span>
+                          {isLeader && <span style={{ padding: '3px 7px', borderRadius: 999, background: '#dcfce7', color: '#15803d', fontSize: 11, fontWeight: 900 }}>Leading</span>}
+                        </div>
+                        <div style={{ color: '#64748b', fontSize: 12, marginTop: 3 }}>
+                          {count} vote{count === 1 ? '' : 's'} - average {count > 0 ? averageScore.toFixed(2) : '--'}
+                        </div>
+                      </div>
+                      <span style={{ color: count > 0 ? '#2563eb' : '#94a3b8', fontWeight: 950, fontSize: 18, whiteSpace: 'nowrap' }}>
+                        {count > 0 ? `${total.toFixed(0)} pts` : '--'}
+                      </span>
                     </div>
                   );
                 })}

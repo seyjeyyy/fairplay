@@ -19,8 +19,8 @@ export default function OrganizerScoring() {
   const { user } = useAuthStore();
   const { events, fetchEvents } = useEventStore();
   const { success } = useNotificationStore();
-  const { fetchScores, getLiveFeed, calculateLeaderboard } = useScoreStore();
-  const { fetchAudienceScores, getAudienceSummary, subscribeToAudienceScores } = useAudienceScoreStore();
+  const { fetchScores, getLiveFeed, calculateLeaderboard, scores } = useScoreStore();
+  const { fetchAudienceScores, getAudienceSummary, subscribeToAudienceScores, submissions } = useAudienceScoreStore();
   const eventIdFromUrl = searchParams.get('eventId');
   const [selectedEvent, setSelectedEvent] = useState(eventIdFromUrl || '');
   const [activeTab, setActiveTab] = useState('leaderboard');
@@ -45,15 +45,15 @@ export default function OrganizerScoring() {
   const selected = events.find((event) => String(event.id) === String(selectedEvent)) || null;
   const liveFeed = useMemo(
     () => (selected ? getLiveFeed(selected.id, selected.criteria || []) : []),
-    [getLiveFeed, selected]
+    [getLiveFeed, scores, selected]
   );
   const leaderboard = useMemo(
     () => (selected ? calculateLeaderboard(selected.id, selected.criteria || []) : []),
-    [calculateLeaderboard, selected]
+    [calculateLeaderboard, scores, selected, submissions]
   );
   const audienceSummary = useMemo(
     () => (selected ? getAudienceSummary(selected.id) : { totalSubmissions: 0, byContestant: {} }),
-    [getAudienceSummary, selected]
+    [getAudienceSummary, selected, submissions]
   );
   const audienceEnabled = Boolean(selected?.audienceImpactEnabled ?? selected?.audienceImpact);
 

@@ -8,8 +8,8 @@ import useAudienceScoreStore from '../../store/audienceScoreStore';
 export default function PublicLeaderboard() {
   const { id } = useParams();
   const { events, fetchEvents } = useEventStore();
-  const { fetchScores, calculateLeaderboard } = useScoreStore();
-  const { fetchAudienceScores, subscribeToAudienceScores } = useAudienceScoreStore();
+  const { fetchScores, calculateLeaderboard, scores } = useScoreStore();
+  const { fetchAudienceScores, subscribeToAudienceScores, submissions } = useAudienceScoreStore();
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -42,7 +42,7 @@ export default function PublicLeaderboard() {
       averageScore: null,
       totalScores: 0,
     }));
-  }, [calculateLeaderboard, contestants, event]);
+  }, [calculateLeaderboard, contestants, event, scores, submissions]);
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg,#f8fbff,#eff6ff)', color: '#0f172a' }}>
