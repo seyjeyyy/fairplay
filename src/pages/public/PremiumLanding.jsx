@@ -60,25 +60,6 @@ const AuthModal = ({ mode: initialMode, onClose }) => {
     }
   };
 
-  const demoAccounts = [
-    { label: 'Admin', email: 'admin@fairplay.com', password: 'admin123', color: '#a855f7' },
-    { label: 'Organizer', email: 'organizer@fairplay.com', password: 'org123', color: '#06b6d4' },
-    { label: 'Judge', email: 'judge@fairplay.com', password: 'judge123', color: '#10b981' },
-    { label: 'Participant', email: 'participant@fairplay.com', password: 'part123', color: '#f59e0b' },
-  ];
-
-  const quickLogin = async (acc) => {
-    setError('');
-    setLoginData({ email: acc.email, password: acc.password });
-    const result = await store.login(acc.email, acc.password);
-    if (result.success) {
-      onClose();
-      redirectAfterLogin(result.user);
-    } else {
-      setError(result.error || 'Login failed.');
-    }
-  };
-
   return (
     <div className="fp-modal-overlay" ref={overlayRef} onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}>
       <div className="fp-modal">
@@ -114,17 +95,6 @@ const AuthModal = ({ mode: initialMode, onClose }) => {
             <button type="submit" className="fp-btn-primary" disabled={store.loading}>
               {store.loading ? <span className="fp-spinner" /> : 'Sign In →'}
             </button>
-            <div className="fp-demo-section">
-              <div className="fp-demo-label">Quick demo access</div>
-              <div className="fp-demo-grid">
-                {demoAccounts.map(acc => (
-                  <button key={acc.label} type="button" className="fp-demo-btn" style={{ '--demo-color': acc.color }}
-                    onClick={() => quickLogin(acc)} disabled={store.loading}>
-                    {acc.label}
-                  </button>
-                ))}
-              </div>
-            </div>
           </form>
         )}
 

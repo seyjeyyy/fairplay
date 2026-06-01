@@ -4,13 +4,6 @@ import { motion } from 'framer-motion';
 import useAuthStore from '../../store/authStore';
 import useNotificationStore from '../../store/notificationStore';
 
-const DEMO_ACCOUNTS = [
-  { email: 'admin@fairplay.com', role: 'admin', label: 'Super Admin', color: '#ef4444' },
-  { email: 'organizer@fairplay.com', role: 'organizer', label: 'Event Organizer', color: '#06b6d4' },
-  { email: 'judge@fairplay.com', role: 'judge', label: 'Judge', color: '#10b981' },
-  { email: 'participant@fairplay.com', role: 'participant', label: 'Participant', color: '#fbbf24' },
-];
-
 export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuthStore();
@@ -32,23 +25,9 @@ export default function Login() {
       };
       navigate(roleRoutes[result.user.role] || '/dashboard');
     } else {
-      error('Invalid credentials. Try a demo account below.');
+      error('Invalid credentials.');
     }
     setLoading(false);
-  };
-
-  const quickLogin = (demoEmail) => {
-    setEmail(demoEmail);
-    setPassword('password');
-    const result = login(demoEmail, 'password');
-    if (result.success) {
-      success(`Logged in as ${result.user.name}`);
-      const roleRoutes = {
-        admin: '/admin', organizer: '/organizer',
-        judge: '/judge', participant: '/participant',
-      };
-      navigate(roleRoutes[result.user.role] || '/dashboard');
-    }
   };
 
   return (
@@ -146,42 +125,6 @@ export default function Login() {
             <Link to="/register" style={{ color: '#06b6d4', fontSize: 13, textDecoration: 'none' }}>
               Don't have an account? Register
             </Link>
-          </div>
-
-          {/* Demo Accounts */}
-          <div style={{
-            borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 20,
-          }}>
-            <p style={{ fontSize: 12, color: '#666', textAlign: 'center', marginBottom: 12 }}>
-              Quick Demo Access
-            </p>
-            <div style={{ display: 'grid', gap: 8 }}>
-              {DEMO_ACCOUNTS.map((account) => (
-                <motion.button
-                  key={account.role}
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  type="button"
-                  onClick={() => quickLogin(account.email)}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '10px 16px', borderRadius: 10,
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    cursor: 'pointer', color: '#a0aec0', fontSize: 13,
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{
-                      width: 8, height: 8, borderRadius: '50%',
-                      background: account.color,
-                    }} />
-                    <span>{account.label}</span>
-                  </div>
-                  <code style={{ fontSize: 11, color: '#666' }}>{account.email}</code>
-                </motion.button>
-              ))}
-            </div>
           </div>
         </form>
       </motion.div>

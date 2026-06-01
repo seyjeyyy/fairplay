@@ -2,9 +2,9 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { isSupabaseConfigured, supabase } from '../utils/supabaseClient';
 
-const DEMO_MODE_ENABLED = import.meta.env.VITE_DEMO_MODE !== 'false';
+const DEMO_MODE_ENABLED = import.meta.env.VITE_DEMO_MODE === 'true';
 const SUPABASE_AUTH_ENABLED = isSupabaseConfigured;
-const HYBRID_MODE = isSupabaseConfigured && !DEMO_MODE_ENABLED;
+const HYBRID_MODE = isSupabaseConfigured && DEMO_MODE_ENABLED;
 const APP_URL =
   import.meta.env.VITE_SITE_URL ||
   import.meta.env.VITE_APP_URL ||
@@ -376,9 +376,11 @@ const useAuthStore = create(
 
           return { success: true, user: sessionUser };
         } catch (error) {
-          const safeUser = getSeedUser(normalizedEmail, password) || get().users.find((entry) =>
-            String(entry.email || '').toLowerCase() === normalizedEmail &&
-            entry.password === password
+          const safeUser = DEMO_MODE_ENABLED && (
+            getSeedUser(normalizedEmail, password) || get().users.find((entry) =>
+              String(entry.email || '').toLowerCase() === normalizedEmail &&
+              entry.password === password
+            )
           );
           if (safeUser) {
             const token = `token_${safeUser.id}_${Date.now()}`;

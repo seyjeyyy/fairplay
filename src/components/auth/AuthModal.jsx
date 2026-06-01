@@ -3,11 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
 import { getPostAuthPath } from '../../utils/navigation';
 
-const DEMO_ACCOUNTS = [
-  { label: 'Admin', email: 'admin@fairplay.com', password: 'Admin123!', color: '#a855f7', icon: 'bi bi-shield-check' },
-  { label: 'Organizer', email: 'organizer@fairplay.com', password: 'Organizer123!', color: '#06b6d4', icon: 'bi bi-kanban' },
-];
-
 export default function AuthModal({ onClose }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -16,7 +11,6 @@ export default function AuthModal({ onClose }) {
 
   const store = useAuthStore();
   const authMode = store.authMode;
-  const showsDemoAccess = authMode === 'demo' || authMode === 'hybrid';
   const authModeLabel = authMode === 'hybrid'
     ? 'Supabase Auth with Demo Backup'
     : authMode === 'demo'
@@ -131,19 +125,6 @@ export default function AuthModal({ onClose }) {
     }
 
     setError(result.error || 'Registration failed.');
-  };
-
-  const quickLogin = async (account) => {
-    setError('');
-    setNotice('');
-    setLoginData({ email: account.email, password: account.password });
-    const result = await store.login(account.email, account.password);
-    if (result.success) {
-      onClose();
-      redirectAfterLogin(result.user);
-      return;
-    }
-    setError(result.error || 'Login failed.');
   };
 
   return (
@@ -281,12 +262,6 @@ export default function AuthModal({ onClose }) {
                   <input type="checkbox" checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} style={{ width: 16, height: 16, accentColor: '#06b6d4' }} />
                   Remember me
                 </label>
-                {showsDemoAccess && (
-                  <span style={{ fontSize: 12, color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <i className="bi bi-info-circle" />
-                    Demo access available
-                  </span>
-                )}
               </div>
 
               <button type="submit" disabled={store.loading} style={primaryButtonStyle}>
@@ -295,27 +270,6 @@ export default function AuthModal({ onClose }) {
                   {store.loading ? 'Signing In...' : 'Sign In'}
                 </span>
               </button>
-
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 20, marginTop: 24 }}>
-                <p style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', marginBottom: 8 }}>Quick demo access</p>
-                <p style={{ fontSize: 11, color: '#64748b', textAlign: 'center', marginBottom: 16 }}>Use seeded role accounts for capstone walkthroughs and QA.</p>
-                {showsDemoAccess ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    {DEMO_ACCOUNTS.map((account) => (
-                      <button key={account.label} type="button" onClick={() => quickLogin(account)} disabled={store.loading} style={{ padding: '10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ width: 28, height: 28, borderRadius: 8, background: `${account.color}22`, color: account.color, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <i className={account.icon} />
-                        </span>
-                        {account.label}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ padding: 12, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', color: '#94a3b8', fontSize: 12, textAlign: 'center' }}>
-                    Demo login is disabled for this environment.
-                  </div>
-                )}
-              </div>
             </form>
           )}
 
